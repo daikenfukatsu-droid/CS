@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>自己完結率 分析ダッシュボード</title>
+<style>
+  :root{
+    --bg:#eef1f6; --panel:#ffffff; --panel-2:#f7f9fc;
+    --ink:#12203a; --ink-2:#5a6b85; --ink-3:#8a99b3;
+    --line:#e3e8f0; --line-2:#eef2f7;
+    --brand:#0f1b32; --brand-ink:#c7d2e6; --brand-ink-2:#7c8bab;
+    --accent:#2a6fd6; --accent-soft:#e7f0fc;
+    --good:#0ca35a; --okblue:#2a6fd6; --warn:#e79a00; --crit:#e0483f;
+    --c1:#2a6fd6; --c2:#17a67a; --c3:#e79a00; --c4:#7a5cd0; --c5:#e06aa0; --c6:#4aa3b8; --c7:#8a99b3; --c8:#c98f4a;
+    --r1:#e0483f; --r2:#ef7a52; --r3:#f0a63a; --r4:#c76b8e; --r5:#9aa7bd; --r6:#c98f4a;
+    --shadow:0 1px 2px rgba(16,32,58,.06),0 6px 20px rgba(16,32,58,.05);
+    --radius:14px;
+    --font:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic UI","Meiryo",system-ui,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#0c1017; --panel:#141a24; --panel-2:#10151d;
+      --ink:#eef2f8; --ink-2:#a7b4c7; --ink-3:#6f7d93;
+      --line:#232c3a; --line-2:#1b2330;
+      --brand:#0a0e15; --brand-ink:#c7d2e6; --brand-ink-2:#6f7d93;
+      --accent:#4f92ec; --accent-soft:#17263c;
+      --good:#25b06a; --okblue:#4f92ec; --warn:#f0ab2e; --crit:#ef6a61;
+      --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);
+    }
+  }
+  *{box-sizing:border-box} html,body{margin:0;padding:0}
+  .srd{font-family:var(--font);background:var(--bg);color:var(--ink);min-height:100vh;display:grid;grid-template-columns:212px 1fr;font-feature-settings:"palt";}
+  .side{background:var(--brand);color:var(--brand-ink);padding:20px 16px;display:flex;flex-direction:column;gap:24px;position:sticky;top:0;height:100vh}
+  .brand{display:flex;align-items:center;gap:11px}
+  .brand .logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#2a6fd6,#4aa3b8);display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;font-size:16px}
+  .brand b{font-size:14px;color:#fff;font-weight:600}
+  .brand span{display:block;font-size:11px;color:var(--brand-ink-2);margin-top:2px}
+  .nav a{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:9px;color:#fff;text-decoration:none;font-size:13.5px;background:var(--accent)}
+  .side .foot{margin-top:auto;font-size:11px;color:var(--brand-ink-2);display:flex;flex-direction:column;gap:9px}
+  .link-badge{display:flex;align-items:center;gap:8px;color:var(--brand-ink)}
+  .live{width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 0 3px color-mix(in srgb,var(--good) 25%,transparent)}
+  .main{padding:22px 26px 40px;min-width:0}
+  .top{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;justify-content:space-between;margin-bottom:14px}
+  .top h1{font-size:21px;font-weight:700;margin:0}
+  .top .sub{font-size:12.5px;color:var(--ink-2);margin-top:3px}
+  .snap{font-size:11px;color:var(--ink-3);border:1px dashed var(--line);padding:5px 10px;border-radius:8px;align-self:center}
+  .selbase,.cc-sel,.miniowner{appearance:none;background:var(--panel);border:1px solid var(--line);color:var(--ink);font-family:inherit;cursor:pointer;
+    background-image:linear-gradient(45deg,transparent 50%,var(--ink-3) 50%),linear-gradient(135deg,var(--ink-3) 50%,transparent 50%);
+    background-position:calc(100% - 16px) 55%,calc(100% - 11px) 55%;background-size:5px 5px,5px 5px;background-repeat:no-repeat}
+  .ctrl{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px 16px;margin-bottom:16px;display:flex;flex-direction:column;gap:12px}
+  .ctrl-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:space-between}
+  .ctrl-left{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .clabel{font-size:11px;letter-spacing:.06em;color:var(--ink-3);font-weight:600}
+  .seg{display:inline-flex;gap:6px;flex-wrap:wrap}
+  .seg button,.fy button{font-family:inherit;font-size:13px;font-weight:600;color:var(--ink-2);background:var(--panel);border:1px solid var(--line);padding:7px 15px;border-radius:9px;cursor:pointer;transition:.12s}
+  .seg button:hover,.fy button:hover{border-color:var(--accent);color:var(--ink)}
+  .seg button.on,.fy button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .fy{display:inline-flex;gap:6px}
+  .chiprow{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px}
+  .chiprow button{font-family:inherit;font-size:13px;color:var(--ink-2);background:var(--panel);border:1px solid var(--line);padding:6px 13px;border-radius:8px;cursor:pointer;white-space:nowrap}
+  .chiprow button:hover{border-color:var(--accent)}
+  .chiprow button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .chiprow button:disabled{opacity:.4;cursor:default}
+  .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:12px}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 15px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+  .kpi .k{font-size:11.5px;color:var(--ink-2)}
+  .kpi .v{font-size:26px;font-weight:700;margin-top:6px;font-variant-numeric:tabular-nums;line-height:1}
+  .kpi .d{font-size:11.5px;margin-top:7px;font-weight:600}
+  .kpi .d.up{color:var(--good)} .kpi .d.dn{color:var(--crit)} .kpi .d.mut{color:var(--ink-3);font-weight:500}
+  .kpi .stripe{position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--accent)}
+  .kpi.k-good .stripe{background:var(--good)} .kpi.k-warn .stripe{background:var(--warn)} .kpi.k-crit .stripe{background:var(--crit)}
+  .kdetail{position:absolute;top:9px;right:9px;font-size:10.5px;color:var(--accent);background:var(--accent-soft);border:none;border-radius:20px;padding:3px 10px;cursor:pointer;font-family:inherit;z-index:2}
+  .kdetail:hover{filter:brightness(0.97)}
+  .flow{display:flex;align-items:stretch;gap:4px;width:100%}
+  .fbox{flex:1 1 0;min-width:0;background:var(--panel-2);border:1px solid var(--line);border-radius:9px;padding:8px 5px;display:flex;flex-direction:column;gap:2px;text-align:center;justify-content:center}
+  .fbox .fn{font-size:10px;color:var(--ink-2);line-height:1.2;word-break:break-word}
+  .fbox .fv{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--ink);line-height:1}
+  .fbox.done{background:color-mix(in srgb,var(--good) 12%,var(--panel));border-color:color-mix(in srgb,var(--good) 40%,var(--line))}
+  .fbox.done .fn,.fbox.done .fv{color:var(--good)}
+  .farr{flex:0 0 auto;align-self:center;color:var(--ink-3);font-size:12px}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px 17px;box-shadow:var(--shadow);margin-bottom:12px}
+  .panel h3{font-size:13.5px;font-weight:600;margin:0 0 2px}
+  .panel .pnote{font-size:11px;color:var(--ink-3);margin:0}
+  .phead{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}
+  .tag{font-size:10.5px;color:var(--ink-2);background:var(--panel-2);border:1px solid var(--line);padding:3px 8px;border-radius:20px;white-space:nowrap}
+  .ownersel{display:flex;align-items:center;gap:7px}
+  .miniowner{font-size:12px;border-radius:8px;padding:5px 28px 5px 9px}
+  .legend{display:flex;flex-wrap:wrap;gap:10px 16px;margin-top:10px;font-size:12px;color:var(--ink-2)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}.legend i{width:10px;height:10px;border-radius:3px}
+  .cctrl{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin-bottom:12px}
+  .cc-axis{display:flex;align-items:center;gap:8px}
+  .cc-lab{font-size:11px;color:var(--ink-3);font-weight:600}
+  .cc-sel{font-size:13px;padding:7px 30px 7px 12px;border-radius:9px;min-width:150px}
+  .cc-sel:focus{outline:2px solid var(--accent);outline-offset:1px}
+  .cc-metric{margin-left:auto;display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .cc-metric button{font-family:inherit;font-size:12px;font-weight:600;color:var(--ink-2);background:var(--panel);border:none;padding:6px 14px;cursor:pointer}
+  .cc-metric button.on{background:var(--accent);color:#fff}
+  .ctbl{border-collapse:separate;border-spacing:3px;font-size:12px;min-width:560px;font-variant-numeric:tabular-nums}
+  .ctbl th{color:var(--ink-3);font-weight:500;font-size:11px;padding:6px 8px;text-align:center;white-space:nowrap}
+  .ctbl th.rowh{text-align:left}
+  .ctbl td{text-align:center;padding:7px 8px;border-radius:6px;white-space:nowrap}
+  .ctbl td.rowlab{text-align:left;font-weight:500;color:var(--ink);white-space:nowrap}
+  .ctbl td.tot{background:var(--panel-2);font-weight:600;color:var(--ink)}
+  .ctbl td.grand{background:var(--accent-soft);color:var(--accent);font-weight:700}
+  svg{display:block;width:100%;height:100%}
+  .chart-vol{height:230px} .chart-donut{height:230px}
+  .donut-wrap{display:grid;grid-template-columns:180px 1fr;gap:12px;align-items:center}
+  .dlist{display:flex;flex-direction:column;gap:6px;font-size:12px}
+  .dlist .di{display:grid;grid-template-columns:11px 1fr auto auto;gap:9px;align-items:center;color:var(--ink-2)}
+  .dlist .di i{width:11px;height:11px;border-radius:3px}
+  .dlist .di b{color:var(--ink);font-variant-numeric:tabular-nums;font-weight:600}
+  .dlist .di .pct{color:var(--ink-3);font-variant-numeric:tabular-nums;min-width:42px;text-align:right}
+  .di-more{display:flex;flex-direction:column;gap:6px}
+  .di-toggle{margin-top:5px;font-family:inherit;font-size:11.5px;color:var(--accent);background:none;border:none;cursor:pointer;text-align:left;padding:2px 0}
+  .di-toggle:hover{text-decoration:underline}
+  .empty{color:var(--ink-3);font-size:12.5px;padding:20px 0;text-align:center}
+  .drawer-ov{position:fixed;inset:0;background:rgba(0,0,0,.35);opacity:0;visibility:hidden;transition:opacity .2s,visibility .2s;z-index:40}
+  .drawer-ov.open{opacity:1;visibility:visible}
+  .drawer{position:fixed;top:0;right:0;height:100vh;width:430px;max-width:92vw;background:var(--panel);box-shadow:-8px 0 30px rgba(0,0,0,.18);transform:translateX(100%);transition:transform .25s ease;z-index:50;padding:20px;overflow-y:auto}
+  .drawer.open{transform:translateX(0)}
+  .drawer-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+  .drawer-h h3{font-size:15px;font-weight:600;margin:0}
+  .drawer-h button{background:none;border:none;font-size:18px;color:var(--ink-3);cursor:pointer;line-height:1}
+  @keyframes drwin{from{opacity:.3;transform:translateX(26px)}to{opacity:1;transform:none}}
+  .drw-anim{animation:drwin .22s ease}
+  .dbar{height:14px;background:var(--line-2);border-radius:5px;overflow:hidden}
+  .dbar-f{height:100%;border-radius:5px}
+  .dsub{font-size:10.5px;color:var(--ink-3);margin-top:4px}
+  .l1row{display:grid;grid-template-columns:1fr auto 14px;gap:8px;align-items:center;padding:9px 11px;border:1px solid var(--line);border-radius:8px;cursor:pointer;font-size:12.5px}
+  .l1row:hover{border-color:var(--accent)}
+  .l1row .l1nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .l1row .l1nm .st{color:var(--ink-3)}
+  .l1row b{font-variant-numeric:tabular-nums}
+  .l1row .chev{color:var(--ink-3)}
+  .drwback{font-size:12px;color:var(--accent);background:none;border:none;cursor:pointer;padding:0;font-family:inherit;margin-bottom:10px}
+  .drwback:hover{text-decoration:underline}
+  .tdlbl{font-size:10.5px;color:var(--ink-3)}
+  .tdval{font-size:13px;color:var(--ink);line-height:1.5;word-break:break-word}
+  .tdsubj{font-size:15px;font-weight:600;line-height:1.4;margin:2px 0 8px}
+  .tdbtns{display:flex;gap:8px;margin-top:8px}
+  .tdbtn{flex:1;text-align:center;padding:9px;border-radius:8px;font-size:12.5px;font-weight:500;text-decoration:none;cursor:pointer}
+  .tdbtn.pri{background:var(--accent-soft);color:var(--accent)}
+  .tdbtn.sec{border:1px solid var(--line);color:var(--ink)}
+  @media (max-width:1080px){ .srd{grid-template-columns:1fr} .side{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center} .side .foot{margin-left:auto;flex-direction:row} .kpis{grid-template-columns:repeat(3,1fr)} .row2{grid-template-columns:1fr} }
+  @media (max-width:560px){ .kpis{grid-template-columns:repeat(2,1fr)} .donut-wrap{grid-template-columns:1fr} .cc-metric{margin-left:0} .fbox .fv{font-size:13px} .fbox .fn{font-size:8.5px} }
+</style>
+</head>
+<body>
+<div class="srd">
+  <aside class="side">
+    <div class="brand"><div class="logo">CS</div><div><b>採用一括かんりくん</b><span>CSサポート KPI</span></div></div>
+    <nav class="nav"><a href="#">サマリー</a></nav>
+    <div class="foot">
+      <div style="letter-spacing:.08em;font-size:10px;text-transform:uppercase">データ連携</div>
+      <div class="link-badge"><span class="live"></span>HubSpot ・ raw_all</div>
+      <div>対応件数＝全件／率は評価済みベース</div>
+    </div>
+  </aside>
+  <main class="main">
+    <div class="top">
+      <div><h1>自己完結率 分析ダッシュボード</h1><div class="sub">HubSpot サポートチケット × 自己完結率KPI（○＝自己完結）</div></div>
+      <div class="snap" id="snap"></div>
+    </div>
+
+    <div class="ctrl">
+      <div class="ctrl-row">
+        <div class="ctrl-left"><span class="clabel">表示単位</span><div class="seg" id="segUnit"></div></div>
+        <div class="fy" id="fyToggle"></div>
+      </div>
+      <div class="chiprow" id="chips"></div>
+    </div>
+
+    <section class="kpis" id="kpi"></section>
+
+    <div class="panel">
+      <div class="phead"><div><h3>ステータス別フロー</h3><p class="pnote">選択期間の作成チケットを現在ステータス別に集計（緑＝完了系）</p></div><span class="tag" id="flowTag"></span></div>
+      <div class="flow" id="flow"></div>
+    </div>
+
+    <div class="panel">
+      <div class="phead"><div><h3>件数の推移</h3><p class="pnote" id="volNote"></p></div>
+        <div class="ownersel"><span class="clabel" style="font-size:11px">担当者</span>
+          <select class="selbase miniowner" id="trendOwner"><option value="all">全担当者</option></select></div></div>
+      <div class="chart-vol" id="chVol"></div>
+      <div class="legend"><span><i style="background:var(--okblue)"></i>自己完結</span><span><i style="background:var(--line)"></i>それ以外</span></div>
+    </div>
+
+    <div class="row2">
+      <div class="panel"><div class="phead"><div><h3>ケース種別の内訳</h3><p class="pnote">件数シェア（選択期間）</p></div></div>
+        <div class="donut-wrap"><div class="chart-donut" id="chCase"></div><div class="dlist" id="lgCase"></div></div></div>
+      <div class="panel"><div class="phead"><div><h3>未達（×・△）の理由内訳</h3><p class="pnote">kpiValue（J列）ベース</p></div></div>
+        <div class="donut-wrap"><div class="chart-donut" id="chReason"></div><div class="dlist" id="lgReason"></div></div></div>
+    </div>
+
+    <div class="row2">
+      <div class="panel"><div class="phead"><div><h3>発生源（origin）の内訳</h3><p class="pnote">件数シェア（選択期間）</p></div></div>
+        <div class="donut-wrap"><div class="chart-donut" id="chOrigin"></div><div class="dlist" id="lgOrigin"></div></div></div>
+      <div class="panel"><div class="phead"><div><h3>領域 の内訳</h3><p class="pnote">件数シェア（選択期間）</p></div></div>
+        <div class="donut-wrap"><div class="chart-donut" id="chCs"></div><div class="dlist" id="lgCs"></div></div></div>
+    </div>
+
+    <div class="row2">
+      <div class="panel"><div class="phead"><div><h3>原因_大分類 の内訳</h3><p class="pnote">上位10件（残りはトグル）・原因入力ありのみ</p></div></div>
+        <div class="donut-wrap"><div class="chart-donut" id="chCmaj"></div><div class="dlist" id="lgCmaj"></div></div></div>
+      <div class="panel"><div class="phead"><div><h3>原因_小分類 の内訳</h3><p class="pnote">上位10件（残りはトグル）・原因入力ありのみ</p></div></div>
+        <div class="donut-wrap"><div class="chart-donut" id="chCmin"></div><div class="dlist" id="lgCmin"></div></div></div>
+    </div>
+
+    <div class="panel">
+      <div class="phead"><div><h3>クロス分析</h3><p class="pnote">縦軸×横軸を選択（同一項目は不可）／件数・％（全体比）切替</p></div><span class="tag" id="crossTag"></span></div>
+      <div class="cctrl">
+        <div class="cc-axis"><span class="cc-lab">縦軸</span><select class="cc-sel" id="crossRowSel"></select></div>
+        <div class="cc-axis"><span class="cc-lab">横軸</span><select class="cc-sel" id="crossColSel"></select></div>
+        <div class="cc-metric" id="crossMetric"><button data-m="count" class="on">件数</button><button data-m="pct">％</button></div>
+      </div>
+      <div style="overflow-x:auto"><table class="ctbl" id="crossTbl"></table></div>
+    </div>
+  </main>
+</div>
+
+<div class="drawer-ov" id="drawerOv"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <div class="drawer-h"><h3 id="drawerTitle">詳細</h3><button id="drawerClose" type="button" aria-label="閉じる">✕</button></div>
+  <p class="pnote" id="drawerNote"></p>
+  <div id="drawerBody" style="display:flex;flex-direction:column;gap:8px;margin-top:10px"></div>
+</aside>
+
+<script>
+const AGG = <?!= aggJson ?>;
+const TARGET = 85;
+const TOPN = 10;
+const URLBASE = 'https://app.hubspot.com/help-desk/23871469/view/105598228/ticket/';
+const UNITS = ['毎日','週次','月間','四半期','半期','年間'];
+const DIM = [{k:'case',label:'ケース種別'},{k:'reason',label:'未達理由'},{k:'origin',label:'発生源'},{k:'area',label:'領域'},{k:'cmaj',label:'原因_大分類'},{k:'cmin',label:'原因_小分類'}];
+const FLOW = ['未対応','メール返信有','返信待ち','対応中','回答チェック中','リマインド対応要','顧客対応待ち','開発対応待ち','開発調査中','未解消完了','対応完了'];
+const DONE = {'未解消完了':1,'対応完了':1};
+const cssv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const fmt = n => n.toLocaleString('ja-JP');
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const pct = (o,t) => t>0 ? o/t*100 : 0;
+const pad = n => ('0'+n).slice(-2);
+const state = { fy:(AGG.fys||[]).slice(-1)[0]||'FY'+new Date().getFullYear(), unit:'月間', bkey:null, owner:'all', crossRow:2, crossCol:0, crossMetric:'count', drawer:null, cLevel:1, cO:-1, cS:-1, cTid:'' };
+let _RR=[], _A={o:{}}, _tag='', _lastDrwKey='';
+
+function addDays(ymd,n){const[Y,M,D]=ymd.split('-').map(Number);const dt=new Date(Date.UTC(Y,M-1,D));dt.setUTCDate(dt.getUTCDate()+n);return dt.toISOString().slice(0,10);}
+function monthEnd(y,m){return new Date(Date.UTC(y,m,0)).toISOString().slice(0,10);}
+function weekStart(ymd){const[Y,M,D]=ymd.split('-').map(Number);const dt=new Date(Date.UTC(Y,M-1,D));const wd=(dt.getUTCDay()+6)%7;dt.setUTCDate(dt.getUTCDate()-wd);return dt.toISOString().slice(0,10);}
+function fyYear(fy){return +fy.slice(2);}
+function fyRange(fy){const y=fyYear(fy);return [`${y}-04-01`,`${y+1}-03-31`];}
+function daysInRange(s,e){return AGG.days.filter(d=>d.d>=s&&d.d<=e);}
+
+function buckets(fy,unit){
+  const y=fyYear(fy),[fs,fe]=fyRange(fy),out=[];
+  if(unit==='年間'){out.push({key:'y',label:'通年',start:fs,end:fe});}
+  else if(unit==='半期'){out.push({key:'h1',label:'上期(4-9月)',start:`${y}-04-01`,end:`${y}-09-30`});out.push({key:'h2',label:'下期(10-3月)',start:`${y}-10-01`,end:`${y+1}-03-31`});}
+  else if(unit==='四半期'){out.push({key:'q1',label:'Q1(4-6)',start:`${y}-04-01`,end:`${y}-06-30`});out.push({key:'q2',label:'Q2(7-9)',start:`${y}-07-01`,end:`${y}-09-30`});out.push({key:'q3',label:'Q3(10-12)',start:`${y}-10-01`,end:`${y}-12-31`});out.push({key:'q4',label:'Q4(1-3)',start:`${y+1}-01-01`,end:`${y+1}-03-31`});}
+  else if(unit==='月間'){for(let i=0;i<12;i++){const mm=((3+i)%12)+1,cy=i<=8?y:y+1;out.push({key:`m${cy}-${pad(mm)}`,label:`${mm}月`,start:`${cy}-${pad(mm)}-01`,end:monthEnd(cy,mm)});}}
+  else if(unit==='週次'){const ws={};daysInRange(fs,fe).forEach(d=>{ws[weekStart(d.d)]=1;});Object.keys(ws).sort().forEach(s=>{out.push({key:'w'+s,label:`${+s.slice(5,7)}/${+s.slice(8,10)}週`,start:s,end:addDays(s,6)});});}
+  else if(unit==='毎日'){daysInRange(fs,fe).forEach(d=>{out.push({key:'d'+d.d,label:`${+d.d.slice(5,7)}/${+d.d.slice(8,10)}`,start:d.d,end:d.d});});}
+  return out;
+}
+function bucketHasData(b){return AGG.days.some(d=>d.d>=b.start&&d.d<=b.end);}
+function aggDays(days){const A={t:0,k:0,e:0,o:{}};days.forEach(z=>{A.t+=z.t;A.k+=z.k;A.e+=(z.e||0);for(const n in z.o){A.o[n]=A.o[n]||[0,0,0];A.o[n][0]+=z.o[n][0];A.o[n][1]+=z.o[n][1];A.o[n][2]+=(z.o[n][2]||0);}});return A;}
+function statusColor(r){return r>=95?cssv('--good'):r>=85?cssv('--okblue'):r>=70?cssv('--warn'):cssv('--crit');}
+
+function renderFlow(RRf){
+  const cnt={};RRf.forEach(t=>{const s=t[7];if(s>=0){const l=AGG.dict.stage[s];cnt[l]=(cnt[l]||0)+1;}});
+  document.getElementById('flow').innerHTML=FLOW.map((s,i)=>{const v=cnt[s]||0;const dn=DONE[s]?' done':'';
+    return (i>0?'<div class="farr">›</div>':'')+`<div class="fbox${dn}"><span class="fn">${s}</span><span class="fv">${fmt(v)}</span></div>`;}).join('');
+}
+function volChart(el,rows,selIdx){
+  if(!rows.length){el.innerHTML='<div class="empty">データがありません</div>';return;}
+  const W=560,H=230,pl=34,pr=10,pt=14,pb=32,x0=pl,x1=W-pr,y0=pt,y1=H-pb;
+  const max=Math.max(1,...rows.map(r=>r.t)),n=rows.length,gap=(x1-x0)/n,bw=Math.min(46,gap*0.6);
+  const Y=v=>y1-(y1-y0)*v/max;let g='';
+  for(let k=0;k<=4;k++){const v=max*k/4,y=Y(v);g+=`<line x1="${x0}" y1="${y}" x2="${x1}" y2="${y}" stroke="${cssv('--line')}" stroke-width="1"/><text x="${x0-6}" y="${y+4}" text-anchor="end" font-size="9.5" fill="${cssv('--ink-3')}">${Math.round(v)}</text>`;}
+  let bars='';rows.forEach((r,i)=>{const cx=x0+gap*(i+0.5),bx=cx-bw/2,sel=i===selIdx;
+    bars+=`<rect x="${bx}" y="${Y(r.t)}" width="${bw}" height="${y1-Y(r.t)}" rx="3" fill="${cssv('--line')}" ${sel?`stroke="${cssv('--accent')}" stroke-width="2"`:''}><title>${r.label} 対応 ${r.t}件</title></rect><rect x="${bx}" y="${Y(r.k)}" width="${bw}" height="${y1-Y(r.k)}" rx="3" fill="${cssv('--okblue')}"><title>${r.label} 自己完結 ${r.k}件</title></rect>`+
+      (n<=13?`<text x="${cx}" y="${H-11}" text-anchor="middle" font-size="9.5" fill="${sel?cssv('--ink'):cssv('--ink-3')}" font-weight="${sel?700:400}">${r.label}</text>`:'');});
+  el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">${g}${bars}</svg>`;
+}
+function donut(el,items,big,small){
+  if(!items.length){el.innerHTML='<div class="empty">データなし</div>';return;}
+  const W=180,H=230,cx=90,cy=110,r=72,ri=46;const total=items.reduce((s,d)=>s+d.val,0)||1;let a=-Math.PI/2,segs='';
+  items.forEach(d=>{const f=d.val/total,a2=a+f*Math.PI*2,x1=cx+r*Math.cos(a),y1=cy+r*Math.sin(a),x2=cx+r*Math.cos(a2),y2=cy+r*Math.sin(a2),x3=cx+ri*Math.cos(a2),y3=cy+ri*Math.sin(a2),x4=cx+ri*Math.cos(a),y4=cy+ri*Math.sin(a),laf=f>0.5?1:0;
+    segs+=`<path d="M${x1} ${y1} A${r} ${r} 0 ${laf} 1 ${x2} ${y2} L${x3} ${y3} A${ri} ${ri} 0 ${laf} 0 ${x4} ${y4} Z" fill="${d.color}" stroke="${cssv('--panel')}" stroke-width="2"><title>${esc(d.label)}: ${d.val}件 (${(f*100).toFixed(1)}%)</title></path>`;a=a2;});
+  el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">${segs}<text x="${cx}" y="${cy-1}" text-anchor="middle" font-size="24" font-weight="700" fill="${cssv('--ink')}">${big}</text><text x="${cx}" y="${cy+17}" text-anchor="middle" font-size="11" fill="${cssv('--ink-3')}">${small}</text></svg>`;
+}
+function rowHtml_(d,total){return `<div class="di"><i style="background:${d.color}"></i><span>${esc(d.label)}</span><b>${fmt(d.val)}</b><span class="pct">${total>0?(d.val/total*100).toFixed(1):'0.0'}%</span></div>`;}
+function dlist(el,items,total){
+  const top=items.slice(0,TOPN), rest=items.slice(TOPN);
+  let html=top.map(d=>rowHtml_(d,total)).join('');
+  if(rest.length){
+    html+=`<div class="di-more" style="display:none">${rest.map(d=>rowHtml_(d,total)).join('')}</div>`
+        + `<button class="di-toggle" type="button" data-n="${rest.length}">▾ 残り ${rest.length} 項目を表示</button>`;
+  }
+  el.innerHTML=html;
+  const btn=el.querySelector('.di-toggle');
+  if(btn) btn.addEventListener('click',function(){const m=el.querySelector('.di-more');const open=m.style.display!=='none';m.style.display=open?'none':'flex';this.textContent=open?`▾ 残り ${this.dataset.n} 項目を表示`:'▴ 折りたたむ';});
+}
+function dimCount(RR,i){const m={};RR.forEach(t=>{const v=t[i];if(v>=0)m[v]=(m[v]||0)+1;});return m;}
+function donutFromRR(cid,lid,RR,i,pal){
+  const key=DIM[i].k;const cm=dimCount(RR,i);
+  const items=Object.keys(cm).map(ix=>({label:AGG.dict[key][ix],val:cm[ix]})).sort((a,b)=>b.val-a.val).map((d,n)=>({label:d.label,val:d.val,color:cssv(pal[n%pal.length])}));
+  const tt=items.reduce((s,d)=>s+d.val,0);
+  donut(document.getElementById(cid),items,fmt(tt),'件');dlist(document.getElementById(lid),items,tt);
+}
+function renderCrossAxes(){
+  const rs=document.getElementById('crossRowSel'),cs=document.getElementById('crossColSel');
+  rs.innerHTML=DIM.map((d,i)=>`<option value="${i}" ${i===state.crossRow?'selected':''}>${d.label}</option>`).join('');
+  cs.innerHTML=DIM.map((d,i)=>`<option value="${i}" ${i===state.crossCol?'selected':''} ${i===state.crossRow?'disabled':''}>${d.label}</option>`).join('');
+  document.getElementById('crossMetric').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.m===state.crossMetric));
+}
+function crossTable(RR){
+  const ri=state.crossRow,ci=state.crossCol,rk=DIM[ri].k,ck=DIM[ci].k;
+  const cellM={},rTot={},cTot={};let grand=0,maxCell=1;
+  RR.forEach(t=>{const rv=t[ri],cv=t[ci];if(rv<0||cv<0)return;const key=rv+'_'+cv;cellM[key]=(cellM[key]||0)+1;rTot[rv]=(rTot[rv]||0)+1;cTot[cv]=(cTot[cv]||0)+1;grand++;});
+  for(const k in cellM)if(cellM[k]>maxCell)maxCell=cellM[k];
+  const rowVals=Object.keys(rTot).sort((a,b)=>rTot[b]-rTot[a]);
+  const colVals=Object.keys(cTot).sort((a,b)=>cTot[b]-cTot[a]);
+  const el=document.getElementById('crossTbl');
+  if(!rowVals.length){el.innerHTML='<tbody><tr><td class="rowlab">データがありません</td></tr></tbody>';return;}
+  const disp=v=>state.crossMetric==='count'?(v||''):(v?(v/grand*100).toFixed(1)+'%':'');
+  let h=`<thead><tr><th class="rowh">${DIM[ri].label}＼${DIM[ci].label}</th>`;
+  colVals.forEach(cv=>h+=`<th>${esc(AGG.dict[ck][cv])}</th>`);h+='<th style="text-align:center">行計</th></tr></thead><tbody>';
+  rowVals.forEach(rv=>{h+=`<tr><td class="rowlab">${esc(AGG.dict[rk][rv])}</td>`;
+    colVals.forEach(cv=>{const v=cellM[rv+'_'+cv]||0,t=v/maxCell,p=Math.round(t*100);
+      h+=`<td style="background:${v?`color-mix(in srgb, var(--accent) ${p}%, var(--panel))`:'transparent'};color:${t>0.5?'#fff':'var(--ink)'};font-weight:${t>=0.5?600:400}">${disp(v)}</td>`;});
+    h+=`<td class="tot">${disp(rTot[rv])}</td></tr>`;});
+  h+='<tr><td class="rowlab" style="font-weight:600">列計</td>';
+  colVals.forEach(cv=>h+=`<td class="tot">${disp(cTot[cv])}</td>`);
+  h+=`<td class="grand">${state.crossMetric==='count'?fmt(grand):'100%'}</td></tr></tbody>`;
+  el.innerHTML=h;
+}
+function renderCross(RR){ renderCrossAxes(); crossTable(RR); }
+
+function openDrawer(mode){ state.drawer=mode; if(mode==='count')state.cLevel=1; _lastDrwKey=''; document.getElementById('drawer').classList.add('open');document.getElementById('drawerOv').classList.add('open'); refreshDrawer(); }
+function closeDrawer(){ state.drawer=null; document.getElementById('drawer').classList.remove('open');document.getElementById('drawerOv').classList.remove('open'); }
+function refreshDrawer(){
+  if(!state.drawer) return;
+  const title=document.getElementById('drawerTitle'), note=document.getElementById('drawerNote'), body=document.getElementById('drawerBody');
+  if(state.drawer==='rate'){
+    title.textContent='担当者別 自己完結率';
+    note.textContent=_tag+'／評価済みベース・全担当者';
+    const ob=Object.keys(_A.o).map(o=>{const a=_A.o[o];return {o,all:a[0],ok:a[1],ev:a[2],r:pct(a[1],a[2])};}).filter(x=>x.all>0).sort((a,b)=>b.r-a.r);
+    body.innerHTML=ob.length?ob.map(x=>`<div><div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:4px"><span style="font-weight:500">${esc(x.o)}</span><span style="font-weight:700;color:${statusColor(x.r)}">${x.r.toFixed(1)}%</span></div><div class="dbar"><div class="dbar-f" style="width:${Math.max(2,x.r).toFixed(1)}%;background:${statusColor(x.r)}"></div></div><div class="dsub">対応 ${fmt(x.all)}件 ・ 自己完結 ${fmt(x.ok)}件 ・ 未解決 ${fmt(x.ev-x.ok)}件</div></div>`).join(''):'<div class="empty">データがありません</div>';
+  } else if(state.drawer==='count'){
+    title.textContent='対応件数の内訳';
+    if(state.cLevel===1){
+      note.textContent=_tag+'／担当者を選択（クリックでステータスへ）';
+      const m={};_RR.forEach(t=>{const o=t[6];m[o]=(m[o]||0)+1;});
+      const rows=Object.keys(m).map(o=>({o:+o,c:m[o]})).sort((a,b)=>b.c-a.c);
+      body.innerHTML=rows.length?rows.map(r=>`<div class="l1row ownrow" data-o="${r.o}"><span class="l1nm">${esc(AGG.dict.owner[r.o])}</span><b>${fmt(r.c)}件</b><span class="chev">›</span></div>`).join(''):'<div class="empty">データがありません</div>';
+    } else if(state.cLevel===2){
+      const on=AGG.dict.owner[state.cO];
+      note.textContent=`${esc(on)} ／ ステータスを選択（クリックで会社へ）`;
+      const m={};_RR.forEach(t=>{if(t[6]!==state.cO)return;const s=t[7];if(s<0)return;m[s]=(m[s]||0)+1;});
+      const rows=Object.keys(m).map(s=>({s:+s,c:m[s]})).sort((a,b)=>b.c-a.c);
+      body.innerHTML=`<button class="drwback" type="button">‹ 担当者へ戻る</button>`+
+        (rows.length?rows.map(r=>`<div class="l1row strow" data-s="${r.s}"><span class="l1nm">${esc(AGG.dict.stage[r.s])}</span><b>${fmt(r.c)}件</b><span class="chev">›</span></div>`).join(''):'<div class="empty">データがありません</div>');
+    } else if(state.cLevel===3){
+      const on=AGG.dict.owner[state.cO], sn=AGG.dict.stage[state.cS];
+      const list=_RR.filter(t=>t[6]===state.cO&&t[7]===state.cS);
+      note.textContent=`${esc(on)} ／ ${esc(sn)}（${fmt(list.length)}件）・会社を選択`;
+      body.innerHTML=`<button class="drwback" type="button">‹ ステータスへ戻る</button>`+
+        (list.length?list.map(t=>{const co=AGG.dict.company[t[8]]||'(会社未設定)';const sj=(t[10]>=0?AGG.dict.subject[t[10]]:'');return `<div class="l1row corow" data-tid="${esc(String(t[9]))}"><span class="l1nm">${esc(co)}${sj?`<span class="st"> ／ ${esc(sj)}</span>`:''}</span><span class="chev">›</span></div>`;}).join(''):'<div class="empty">データがありません</div>');
+    } else {
+      const t=_RR.find(x=>x[6]===state.cO&&x[7]===state.cS&&String(x[9])===String(state.cTid));
+      if(!t){ body.innerHTML='<button class="drwback" type="button">‹ 会社一覧へ戻る</button><div class="empty">チケットが見つかりません</div>'; }
+      else {
+        const co=AGG.dict.company[t[8]]||'(会社未設定)';
+        const subj=(t[10]>=0?AGG.dict.subject[t[10]]:'')||'(件名なし)';
+        const desc=(t[11]>=0?AGG.dict.desc[t[11]]:'');
+        const backlog=(t[12]>=0?AGG.dict.backlog[t[12]]:'');
+        const stg=AGG.dict.stage[t[7]]||'';
+        const url=URLBASE+t[9]+'/';
+        const cms=t[13];
+        let dt='-'; if(cms){ try{ dt=new Date(cms).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}); }catch(_){ dt=''; } }
+        note.textContent=esc(co);
+        const backBtn = backlog ? (/^https?:\/\//.test(backlog)?`<a class="tdbtn sec" href="${esc(backlog)}" target="_blank" rel="noopener">Backlog ↗</a>`:`<span class="tdbtn sec">${esc(backlog)}</span>`) : '';
+        body.innerHTML=`<button class="drwback" type="button">‹ 会社一覧へ戻る</button>
+          <div class="tdlbl">チケット名</div><div class="tdsubj">${esc(subj)}</div>
+          <div style="display:flex;gap:22px;margin-bottom:8px">
+            <div><div class="tdlbl">作成日</div><div class="tdval">${dt}</div></div>
+            <div><div class="tdlbl">ステータス</div><div class="tdval">${esc(stg)}</div></div>
+          </div>
+          <div style="margin-bottom:6px"><div class="tdlbl">チケットの説明</div><div class="tdval">${desc?esc(desc):'—'}</div></div>
+          <div class="tdbtns"><a class="tdbtn pri" href="${url}" target="_blank" rel="noopener">HubSpotで開く ↗</a>${backBtn}</div>
+          <div style="margin-top:12px"><div class="tdlbl">内容</div><div class="tdval" style="color:var(--ink-3)">HubSpotで開くと会話内容（本文）を確認できます。</div></div>`;
+      }
+    }
+  }
+  const key=state.drawer+'/'+(state.drawer==='count'?state.cLevel:'r');
+  if(key!==_lastDrwKey){ body.classList.remove('drw-anim'); void body.offsetWidth; body.classList.add('drw-anim'); _lastDrwKey=key; }
+}
+
+function renderSeg(){document.getElementById('segUnit').innerHTML=UNITS.map(u=>`<button data-u="${u}" class="${u===state.unit?'on':''}">${u}</button>`).join('');}
+function renderFy(){document.getElementById('fyToggle').innerHTML=(AGG.fys||[]).map(f=>`<button data-f="${f}" class="${f===state.fy?'on':''}">${f}</button>`).join('');}
+function renderChips(bs){
+  const cur=bs.find(b=>b.key===state.bkey);
+  if(!cur){const wd=bs.filter(bucketHasData);state.bkey=(wd.slice(-1)[0]||bs.slice(-1)[0]||{}).key;}
+  document.getElementById('chips').innerHTML=bs.map(b=>`<button data-k="${b.key}" class="${b.key===state.bkey?'on':''}" ${bucketHasData(b)?'':'disabled'}>${b.label}</button>`).join('');
+}
+
+function render(){
+  renderSeg();renderFy();
+  const bs=buckets(state.fy,state.unit);renderChips(bs);
+  const sel=bs.find(b=>b.key===state.bkey)||bs[bs.length-1]||{start:'9999',end:'9999',label:'-'};
+  const drs=daysInRange(sel.start,sel.end);
+  const A=aggDays(drs);
+  const ownerIdx = state.owner==='all' ? -1 : (AGG.dict.owner.indexOf(state.owner));
+  const RR=[];drs.forEach(d=>{if(d.rows)for(let i=0;i<d.rows.length;i++){const t=d.rows[i];if(ownerIdx<0||t[6]===ownerIdx)RR.push(t);}});
+  _RR=RR;_A=A;_tag=`${state.fy}・${sel.label}`;
+
+  let T,K,E;
+  if(state.owner==='all'){T=A.t;K=A.k;E=A.e;}
+  else{const a=A.o[state.owner];T=a?a[0]:0;K=a?a[1]:0;E=a?a[2]:0;}
+  const rate=pct(K,E),diff=rate-TARGET,un=E-K;
+  const tag=`${state.fy}・${sel.label}`+(state.owner==='all'?'':`／${state.owner}`);
+
+  document.getElementById('snap').textContent='最終更新: '+(AGG.updatedAt||'-')+' ／ 目標 85%';
+  document.getElementById('crossTag').textContent=tag;
+  document.getElementById('flowTag').textContent=tag;
+  document.getElementById('volNote').textContent=`${state.fy} を「${state.unit}」で集計・選択中: ${sel.label}`+(state.owner==='all'?'':`（${state.owner}）`);
+
+  const cards=[
+    {k:'対応件数',v:fmt(T),d:'<span class="mut">raw_all 全件（D列）</span>',cls:'',detail:'count'},
+    {k:'自己完結件数',v:fmt(K),d:'<span class="mut">○ 判定（J列）</span>',cls:'k-good'},
+    {k:'自己完結率',v:rate.toFixed(1)+'%',d:(diff>=0?`<span class="up">▲ 目標+${diff.toFixed(1)}pt</span>`:`<span class="dn">▼ 目標${diff.toFixed(1)}pt</span>`),cls:rate>=85?'k-good':rate>=70?'k-warn':'k-crit',detail:'rate'},
+    {k:'未解決件数',v:fmt(un),d:'<span class="mut">×・△（評価済み）</span>',cls:'k-crit'},
+    {k:'目標達成',v:(E===0?'—':(rate>=TARGET?'達成':'未達')),d:'<span class="mut">目標 85%</span>',cls:E===0?'':(rate>=85?'k-good':'k-warn')},
+  ];
+  document.getElementById('kpi').innerHTML=cards.map(c=>`<div class="kpi ${c.cls}"><div class="stripe"></div>${c.detail?`<button class="kdetail" type="button" data-mode="${c.detail}">詳細 ›</button>`:''}<div class="k">${c.k}</div><div class="v">${c.v}</div><div class="d">${c.d}</div></div>`).join('');
+
+  renderFlow(RR);
+
+  const to=state.owner;
+  const trendRows=bs.map(b=>{let t=0,k=0;AGG.days.forEach(d=>{if(d.d>=b.start&&d.d<=b.end){if(to==='all'){t+=d.t;k+=d.k;}else{const o=d.o[to];if(o){t+=o[0];k+=o[1];}}}});return{label:b.label,t,k};});
+  volChart(document.getElementById('chVol'),trendRows,bs.findIndex(b=>b.key===state.bkey));
+
+  const casePal=['--c1','--c2','--c3','--c4','--c5','--c6','--c7','--c8'];
+  const reasonPal=['--r1','--r2','--r3','--r4','--r5','--r6','--c4','--c6','--c2'];
+  donutFromRR('chCase','lgCase',RR,0,casePal);
+  donutFromRR('chReason','lgReason',RR,1,reasonPal);
+  donutFromRR('chOrigin','lgOrigin',RR,2,casePal);
+  donutFromRR('chCs','lgCs',RR,3,casePal);
+  donutFromRR('chCmaj','lgCmaj',RR,4,casePal);
+  donutFromRR('chCmin','lgCmin',RR,5,reasonPal);
+
+  renderCross(RR);
+  refreshDrawer();
+}
+
+function refreshOwnerSelect(){
+  const [fs,fe]=fyRange(state.fy),set={};daysInRange(fs,fe).forEach(d=>{for(const o in d.o)set[o]=1;});
+  const sel=document.getElementById('trendOwner'),prev=state.owner;
+  sel.innerHTML='<option value="all">全担当者</option>'+Object.keys(set).sort().map(o=>`<option value="${o}">${o}</option>`).join('');
+  if(!set[prev]&&prev!=='all')state.owner='all';sel.value=state.owner;
+}
+
+(function(){
+  if(!AGG.days||!AGG.days.length){document.getElementById('kpi').innerHTML='<div class="empty" style="grid-column:1/-1">raw_all にデータがありません。メニュー「raw_allを全期間で再構築」を実行してください。</div>';renderSeg();renderFy();return;}
+  refreshOwnerSelect();render();
+  document.getElementById('segUnit').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;state.unit=b.dataset.u;state.bkey=null;render();});
+  document.getElementById('fyToggle').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;state.fy=b.dataset.f;state.bkey=null;refreshOwnerSelect();render();});
+  document.getElementById('chips').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.disabled)return;state.bkey=b.dataset.k;render();});
+  document.getElementById('trendOwner').addEventListener('change',e=>{state.owner=e.target.value;render();});
+  document.getElementById('crossRowSel').addEventListener('change',e=>{const i=+e.target.value;state.crossRow=i;if(state.crossCol===i)state.crossCol=DIM.findIndex((_,j)=>j!==i);render();});
+  document.getElementById('crossColSel').addEventListener('change',e=>{state.crossCol=+e.target.value;render();});
+  document.getElementById('crossMetric').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;state.crossMetric=b.dataset.m;render();});
+  document.getElementById('kpi').addEventListener('click',e=>{const b=e.target.closest('.kdetail');if(b)openDrawer(b.dataset.mode);});
+  document.getElementById('drawerClose').addEventListener('click',closeDrawer);
+  document.getElementById('drawerOv').addEventListener('click',closeDrawer);
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDrawer();});
+  document.getElementById('drawerBody').addEventListener('click',e=>{
+    const own=e.target.closest('.ownrow'); if(own){state.cO=+own.dataset.o;state.cLevel=2;refreshDrawer();return;}
+    const st=e.target.closest('.strow'); if(st){state.cS=+st.dataset.s;state.cLevel=3;refreshDrawer();return;}
+    const co=e.target.closest('.corow'); if(co){state.cTid=co.dataset.tid;state.cLevel=4;refreshDrawer();return;}
+    if(e.target.closest('.drwback')){state.cLevel=Math.max(1,state.cLevel-1);refreshDrawer();return;}
+  });
+})();
+</script>
+</body>
+</html>
