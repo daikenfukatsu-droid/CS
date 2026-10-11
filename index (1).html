@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CS契約ダッシュボード</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.17.0/dist/tabler-icons.min.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  /* ===== Design System v2（IS/FS案件管理ダッシュボードと共通）===== */
+  :root{
+    --ink:#14304a; --ink-soft:#5e7790; --ink-faint:#93a7c0;
+    --brand:#14446e; --brand-mid:#3a78b5; --brand-bright:#2f8fc4; --cyan:#2bb0d4;
+    --success:#2f9e8a; --danger:#d9655c; --warm:#d98c4a;
+    --surface:#ffffff; --surface-2:#f4f8fc; --page:#e9eff6; --hair:rgba(20,48,74,0.07);
+    --shadow-soft:0 10px 30px rgba(8,52,98,.07),0 2px 6px rgba(8,52,98,.04);
+    --shadow-lift:0 18px 44px rgba(8,52,98,.14),0 4px 10px rgba(8,52,98,.07);
+    --grid:#e3e8ee; --axis:#5e7790;
+    --bg-grad:radial-gradient(1100px 560px at 80% -8%, #ffffff 0%, #f4f8fc 35%, #e9eff6 100%);
+  }
+  html.dark{
+    --ink:#f4f8fc; --ink-soft:#c2d0e0; --ink-faint:#9fb0c4;
+    --brand:#62b6df; --brand-mid:#4a86c8; --brand-bright:#45c8ec; --cyan:#45c8ec;
+    --success:#34c0a6; --danger:#e2564e; --warm:#e6924a;
+    --surface:#16304a; --surface-2:#102438; --page:#0c1c2e; --hair:rgba(255,255,255,.08);
+    --shadow-soft:0 12px 34px rgba(0,0,0,.35); --shadow-lift:0 22px 50px rgba(0,0,0,.5);
+    --grid:#24405c; --axis:#c3cbd4;
+    --bg-grad:radial-gradient(1100px 560px at 78% -8%, #1a3a55 0%, #102438 42%, #0c1c2e 100%);
+  }
+  *{box-sizing:border-box}
+  body{ margin:0; font-family:"Inter","Hiragino Sans","Yu Gothic",sans-serif; color:var(--ink); min-height:100vh;
+    background:var(--page); background-image:var(--bg-grad); background-attachment:fixed; transition:background .4s,color .4s; }
+  .num{ font-variant-numeric:tabular-nums; letter-spacing:-0.01em; }
+  .wrap{ max-width:1320px; margin:0 auto; padding:24px 16px 64px; }
+
+  /* ヘッダー */
+  .hdr{ display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:20px; }
+  .hdr h1{ margin:0; font-size:24px; font-weight:700; color:var(--brand); letter-spacing:.01em; }
+  .hdr .sub{ font-size:12px; color:var(--ink-faint); margin-top:4px; }
+  .iconbtn{ width:40px;height:40px;border-radius:50%;background:var(--surface);border:1px solid var(--hair);
+    box-shadow:var(--shadow-soft);display:inline-grid;place-items:center;color:var(--brand);font-size:18px;
+    cursor:pointer;transition:transform .25s,box-shadow .25s; }
+  .iconbtn:hover{ transform:translateY(-2px); box-shadow:var(--shadow-lift); }
+
+  /* フィルターバー */
+  .bar{ display:flex; flex-wrap:wrap; gap:12px 20px; align-items:center; background:var(--surface); border:1px solid var(--hair);
+    border-radius:16px; box-shadow:var(--shadow-soft); padding:14px 18px; margin-bottom:20px; }
+  .bar .lbl{ font-size:11px; font-weight:600; color:var(--ink-faint); margin-right:6px; letter-spacing:.06em; }
+  .seg2{ background:var(--hair); border-radius:9999px; padding:4px; display:inline-flex; gap:2px; flex-wrap:wrap; }
+  .seg2-btn{ border:0; background:transparent; color:var(--ink-soft); font-weight:600; font-size:13px; font-family:inherit;
+    padding:7px 18px; border-radius:9999px; cursor:pointer; transition:all .3s; }
+  .seg2-btn:hover{ color:var(--ink); }
+  .seg2-on{ background:var(--surface); color:var(--brand); box-shadow:0 4px 14px rgba(12,68,124,.18); }
+  html.dark .seg2-on{ background:rgba(124,196,255,0.16); color:#bfe2ff; box-shadow:0 0 0 1px rgba(124,196,255,.25),0 4px 14px rgba(56,189,248,.25); }
+  select{ font-family:inherit; font-size:13px; font-weight:600; color:var(--ink); background:var(--surface-2);
+    border:1px solid var(--hair); border-radius:10px; padding:7px 10px; }
+  .pnav{ display:inline-flex; align-items:center; gap:6px; }
+  .pnav button{ width:30px;height:30px;border-radius:50%;border:1px solid var(--hair);background:var(--surface-2);color:var(--brand);cursor:pointer;font-size:15px; }
+  .pnav .plabel{ min-width:150px; text-align:center; font-weight:700; font-size:14px; }
+  .tag{ display:inline-block; font-size:10px; font-weight:700; padding:2px 8px; border-radius:9999px; margin-left:6px; vertical-align:middle; }
+  .tag-fc{ background:rgba(217,140,74,.15); color:var(--warm); }
+  .tag-act{ background:rgba(47,158,138,.14); color:var(--success); }
+
+  /* セクション */
+  .sec-t{ font-size:13px; font-weight:700; color:var(--ink-soft); letter-spacing:.06em; margin:26px 0 10px; display:flex; align-items:center; gap:8px; }
+  .sec-t::before{ content:""; width:4px; height:14px; border-radius:2px; background:var(--brand-mid); }
+  .grid{ display:grid; gap:14px; }
+  .g4{ grid-template-columns:repeat(4,1fr); } .g3{ grid-template-columns:repeat(3,1fr); } .g5{ grid-template-columns:repeat(5,1fr); } .g2{ grid-template-columns:3fr 2fr; } .g2e{ grid-template-columns:1fr 1fr; }
+  @media (max-width:1100px){ .g5{grid-template-columns:repeat(3,1fr);} .g2,.g2e{grid-template-columns:1fr;} }
+  @media (max-width:720px){ .g3,.g4,.g5{grid-template-columns:repeat(2,1fr);} .pnav .plabel{min-width:110px;} }
+
+  /* KPIカード */
+  .kpi-card{ background:var(--surface); border:1px solid var(--hair); border-radius:16px; box-shadow:var(--shadow-soft);
+    padding:16px 18px; position:relative; border-left:4px solid var(--brand-mid); transition:transform .3s cubic-bezier(.2,.7,.2,1),box-shadow .3s; min-width:0; }
+  .kpi-card:hover{ transform:translateY(-4px); box-shadow:var(--shadow-lift); }
+  .kpi-card .k{ font-size:12px; font-weight:600; color:var(--ink-soft); }
+  .kpi-card .v{ font-size:26px; font-weight:700; margin-top:6px; line-height:1.15; }
+  .kpi-card .s{ font-size:11.5px; color:var(--ink-faint); margin-top:6px; line-height:1.5; }
+  .kpi-card .d{ font-size:12px; font-weight:700; }
+  .b-brand{border-left-color:var(--brand)} .b-cyan{border-left-color:var(--cyan)} .b-ok{border-left-color:var(--success)}
+  .b-bad{border-left-color:var(--danger)} .b-warm{border-left-color:var(--warm)}
+  .up{color:var(--success)} .dn{color:var(--danger)}
+  .help{ display:inline-grid; place-items:center; width:15px; height:15px; border-radius:50%; background:var(--hair); color:var(--ink-faint);
+    font-size:10px; font-weight:700; margin-left:4px; cursor:help; }
+
+  .card{ background:var(--surface); border:1px solid var(--hair); border-radius:16px; box-shadow:var(--shadow-soft); padding:18px; min-width:0; }
+  .card h3{ margin:0 0 4px; font-size:14px; font-weight:700; }
+  .card .cap{ font-size:11.5px; color:var(--ink-faint); margin-bottom:10px; }
+  .chart{ position:relative; height:300px; }
+
+  /* 着地予想 */
+  .land{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:6px; }
+  .land div{ background:var(--surface-2); border-radius:12px; padding:12px; text-align:center; }
+  .land .lk{ font-size:11px; font-weight:700; color:var(--ink-faint); letter-spacing:.08em; }
+  .land .lv{ font-size:19px; font-weight:700; margin-top:4px; }
+  .land .mid{ outline:2px solid var(--brand-mid); outline-offset:-2px; }
+  .upside{ margin-top:14px; display:flex; justify-content:space-between; align-items:center; padding:12px 14px; border-radius:12px;
+    background:linear-gradient(90deg, rgba(47,158,138,.12), rgba(47,158,138,.02)); }
+  .upside .uv{ font-size:22px; font-weight:700; color:var(--success); }
+  .range{ position:relative; height:10px; background:var(--hair); border-radius:9999px; margin:16px 4px 4px; }
+  .range i{ position:absolute; top:0; height:10px; border-radius:9999px; background:linear-gradient(90deg,var(--danger),var(--warm),var(--success)); opacity:.75; }
+  .range b{ position:absolute; top:-4px; width:4px; height:18px; border-radius:2px; background:var(--brand); }
+
+  /* テーブル */
+  .tbl-wrap{ overflow-x:auto; }
+  table{ width:100%; border-collapse:collapse; font-size:12.5px; }
+  th{ text-align:right; font-size:11px; font-weight:700; color:var(--ink-faint); padding:8px 10px; border-bottom:1px solid var(--hair); white-space:nowrap; position:sticky; top:0; background:var(--surface); }
+  td{ text-align:right; padding:9px 10px; border-bottom:1px solid var(--hair); white-space:nowrap; }
+  th:first-child, td:first-child{ text-align:left; }
+  tbody tr{ cursor:pointer; transition:background .2s; }
+  tbody tr:hover{ background:var(--surface-2); }
+  tr.sel{ background:rgba(58,120,181,.10) !important; }
+  .bar-cell{ display:inline-block; height:6px; border-radius:3px; background:var(--brand-mid); opacity:.55; vertical-align:middle; margin-right:6px; }
+  .pill{ display:inline-block; font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:9999px; }
+  .p-danger{ background:rgba(217,101,92,.14); color:var(--danger); } .p-warn{ background:rgba(217,140,74,.15); color:var(--warm); } .p-gray{ background:var(--hair); color:var(--ink-soft); }
+  .risk-wrap{ max-height:420px; overflow:auto; }
+  .note{ font-size:11.5px; color:var(--ink-faint); line-height:1.8; margin-top:30px; }
+  .note b{ color:var(--ink-soft); }
+  .ds-rise{opacity:0;transform:translateY(14px);animation:ds-rise .7s cubic-bezier(.2,.7,.2,1) forwards;}
+  @keyframes ds-rise{to{opacity:1;transform:none;}}
+  a{ color:var(--brand-mid); }
+
+  /* ===== 固定バー（IS/FS案件管理ダッシュボードの uix- 部品と同じ）===== */
+  :root{ --uix-primary:#0284c7; --uix-primary-light:#e0f2fe; --uix-warn-bg:#fff4e5; --uix-warn-ink:#9a5b13; }
+  html.dark{ --uix-primary:#38a8e0; --uix-primary-light:rgba(56,168,224,.16); --uix-warn-bg:rgba(230,146,74,.16); --uix-warn-ink:#f2b77c; }
+  .uix-btn{ display:inline-flex; align-items:center; justify-content:center; gap:6px; padding:0 12px; min-height:32px; border-radius:9px;
+    border:1px solid var(--hair); background:var(--surface); color:var(--ink); font-size:13px; font-weight:600; font-family:inherit;
+    line-height:1; white-space:nowrap; cursor:pointer; }
+  .uix-btn:hover{ border-color:var(--uix-primary); }
+  .uix-detail{ color:var(--uix-primary) !important; background:var(--uix-primary-light) !important; border:1px solid color-mix(in srgb, var(--uix-primary) 40%, transparent) !important; }
+  .uix-bar{ position:sticky; top:0; z-index:30; background:var(--surface); border-radius:16px;
+    box-shadow:0 6px 20px rgba(8,52,98,.10); padding:10px 16px 4px; margin-bottom:16px; }
+  html.dark .uix-bar{ box-shadow:0 8px 24px rgba(0,0,0,.45); }
+  .uix-row{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding-bottom:8px; }
+  .uix-group{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  .uix-lbl2{ font-size:12px; color:var(--ink-soft); font-weight:600; }
+  .uix-seg{ display:inline-flex; background:var(--surface-2); border-radius:10px; padding:3px; gap:2px; }
+  .uix-seg button{ min-height:32px; padding:0 16px; border-radius:8px; border:0; background:transparent; font-family:inherit;
+    color:var(--ink-soft); font-size:13px; font-weight:700; cursor:pointer; }
+  .uix-seg button.uix-seg-on{ background:var(--surface); color:var(--brand); box-shadow:0 1px 4px rgba(12,68,124,.18); }
+  html.dark .uix-seg button.uix-seg-on{ background:rgba(124,196,255,.16); color:#bfe2ff; }
+  .tab-btn{ min-height:32px; padding:0 12px; border-radius:8px; font-size:13px; font-weight:600; font-family:inherit; cursor:pointer; transition:background .2s; }
+  .tab-active{ background:var(--uix-primary); color:#fff; border:1px solid var(--uix-primary); }
+  .tab-inactive{ background:var(--surface); color:var(--ink-soft); border:1px solid var(--hair); }
+  .tab-inactive:hover{ background:var(--surface-2); }
+  .tab-sm{ font-size:12.5px; font-weight:500; }
+  .fy-box{ display:inline-flex; border:1px solid var(--hair); border-radius:9px; overflow:hidden; }
+  .fy-box button{ min-height:32px; padding:0 12px; border:0; font-family:inherit; font-size:12.5px; font-weight:700; cursor:pointer; background:var(--surface-2); color:var(--ink-faint); }
+  .fy-box button.on{ background:var(--uix-primary); color:#fff; }
+  .fy-box button:disabled{ cursor:not-allowed; opacity:.6; }
+  .who{ min-height:34px; font-size:13px; font-weight:700; padding:0 10px; border-radius:9px; border:1px solid var(--hair); background:var(--surface); color:var(--ink); max-width:220px; }
+  .who.on{ border-color:var(--uix-primary); color:var(--uix-primary); background:var(--uix-primary-light); }
+  .uix-upd{ margin-left:auto; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .uix-link{ display:inline-grid; place-items:center; width:32px; height:32px; border-radius:9px; color:var(--brand-mid);
+    font-size:18px; text-decoration:none; border:1px solid var(--hair); }
+  .uix-link:hover{ border-color:var(--uix-primary); }
+  .uix-status{ font-size:12.5px; color:var(--success); display:inline-flex; align-items:center; gap:4px; }
+  .uix-primary-btn{ min-height:34px; padding:0 14px; border-radius:9px; border:0; background:var(--uix-primary); color:#fff; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+  .uix-primary-btn:hover{ opacity:.9; }
+  .uix-viewing{ display:inline-flex; align-items:center; gap:8px; min-height:32px; padding:0 12px; border-radius:9px;
+    font-size:13px; font-weight:600; background:var(--uix-primary-light); color:var(--uix-primary); }
+  .uix-viewing.uix-past{ background:var(--uix-warn-bg); color:var(--uix-warn-ink); }
+  .uix-viewing a{ color:inherit; font-weight:700; text-decoration:underline; cursor:pointer; }
+  .uix-today{ position:relative; }
+  .uix-today::after{ content:""; position:absolute; top:3px; right:4px; width:6px; height:6px; border-radius:50%; background:var(--success); }
+  .uix-navrow{ border-top:1px solid var(--hair); padding-top:6px; padding-bottom:6px; }
+  .uix-nav{ display:flex; gap:4px; flex-wrap:wrap; }
+  .uix-nav a{ display:inline-flex; align-items:center; gap:6px; min-height:32px; padding:0 12px; border-radius:8px;
+    font-size:13px; font-weight:600; color:var(--ink-soft); text-decoration:none; white-space:nowrap; cursor:pointer; }
+  .uix-nav a:hover{ background:var(--surface-2); color:var(--ink); }
+  .uix-nav a.uix-act{ background:var(--uix-primary-light); color:var(--uix-primary); }
+  .uix-menu{ position:relative; margin-left:auto; }
+  .uix-pop{ display:none; position:absolute; right:0; top:40px; width:310px; background:var(--surface); border-radius:12px;
+    box-shadow:0 14px 40px rgba(8,52,98,.25); padding:8px; z-index:45; border:1px solid var(--hair); }
+  .uix-menu.uix-open .uix-pop{ display:block; }
+  .uix-grp{ font-size:12px; font-weight:700; color:var(--ink-faint); padding:8px 10px 4px; }
+  .uix-pop a{ display:flex; align-items:center; gap:8px; min-height:36px; padding:0 10px; border-radius:8px; font-size:13px;
+    color:var(--ink); cursor:pointer; text-decoration:none; }
+  .uix-pop a:hover{ background:var(--surface-2); }
+  .uix-pop a span{ margin-left:auto; font-size:12px; color:var(--ink-faint); }
+  .uix-sec{ scroll-margin-top:190px; }
+  .chips{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
+  .chip{ min-height:28px; padding:0 12px; border-radius:9999px; border:1px solid var(--hair); background:var(--surface); color:var(--ink-soft); font-family:inherit; font-size:12px; font-weight:700; cursor:pointer; }
+  .chip.on{ background:var(--uix-primary-light); color:var(--uix-primary); border-color:color-mix(in srgb, var(--uix-primary) 40%, transparent); }
+  .p-ok{ background:rgba(47,158,138,.14); color:var(--success); }
+  table.sheet{ font-size:12px; }
+  table.sheet td, table.sheet th{ padding:6px 9px; }
+  table.sheet th:first-child, table.sheet td:first-child{ position:sticky; left:0; background:var(--surface); z-index:1; min-width:230px; white-space:normal; }
+  table.sheet tbody tr{ cursor:default; }
+  table.sheet tr.grp td{ font-weight:700; color:var(--ink-soft); background:var(--surface-2); }
+  table.sheet tr.grp td:first-child{ background:var(--surface-2); }
+  table.sheet .hl{ background:rgba(2,132,199,.08); font-weight:700; }
+  table.sheet th.hl{ color:var(--uix-primary); }
+  table.sheet .sep{ border-left:2px solid var(--hair); }
+  .sheet-wrap{ max-height:none; }
+  #loading{ position:fixed; inset:0; z-index:100; display:grid; place-items:center; background:color-mix(in srgb, var(--page) 80%, transparent); backdrop-filter:blur(3px); }
+  #loading .lcard{ background:var(--surface); border:1px solid var(--hair); border-radius:16px; box-shadow:var(--shadow-lift); padding:24px 28px; display:flex; flex-direction:column; align-items:center; gap:12px; max-width:440px; text-align:center; font-size:14px; font-weight:600; color:var(--ink-soft); }
+  #loading .ti{ font-size:28px; color:var(--uix-primary); }
+  #loading.err .ti{ display:none; } #loading.err .lmsg{ color:var(--danger); }
+  .spin{ animation:spin 1s linear infinite; } @keyframes spin{ to{ transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+<div id="loading"><div class="lcard"><i class="ti ti-loader-2 spin"></i><div class="lmsg">スプレッドシートからデータを読み込んでいます…</div><button class="lbtn uix-primary-btn" style="display:none" onclick="location.reload()"><i class="ti ti-refresh"></i> もう一度読み込む</button></div></div>
+<div class="wrap">
+  <div class="hdr">
+    <div>
+      <h1>CS契約ダッシュボード</h1>
+      <div class="sub">データ：20261001_CS_契約DB ／ 基準日 <span id="asof"></span></div>
+    </div>
+    <button class="iconbtn" id="theme" title="ライト／ダーク切替"><i class="ti ti-contrast-2"></i></button>
+  </div>
+
+  <!-- 固定バー（IS/FS案件管理ダッシュボードと同じ構成） -->
+  <div class="uix-bar" id="uixBar">
+    <div class="uix-row">
+      <div class="uix-seg" id="segScope"></div>
+      <div class="uix-group">
+        <span class="uix-lbl2">表示単位:</span>
+        <span id="segPeriod" class="uix-group"></span>
+      </div>
+      <div class="fy-box">
+        <button disabled title="契約DBは2026/4以降のみ">FY2025</button>
+        <button class="on">FY2026</button>
+      </div>
+      <select id="selWho" class="who" title="チーム・メンバーの切り替え"></select>
+      <div class="uix-upd">
+        <a href="https://docs.google.com/spreadsheets/d/1T1zGzRa5miRM6hYFGFHULn4iejL5oOtlcTxX0apJ308/edit?usp=sharing" target="_blank" rel="noopener" class="uix-link" title="元データのスプレッドシート（20261001_CS_契約DB）を開く"><i class="ti ti-table-share"></i></a>
+        <span class="uix-status"><i class="ti ti-square-check-filled"></i><span id="dataStatus"></span></span>
+        <button class="uix-primary-btn" id="btnRefresh" title="スプレッドシートから集計し直す（1〜2分かかることがあります）"><i class="ti ti-refresh"></i> データ更新</button>
+      </div>
+    </div>
+    <div class="uix-row">
+      <div class="uix-group" id="periodTabs"></div>
+      <button type="button" class="uix-btn uix-detail" id="btnToday"><i class="ti ti-calendar-event"></i> 今月</button>
+      <span id="uixViewing" class="uix-viewing"></span>
+    </div>
+    <div class="uix-row uix-navrow">
+      <nav class="uix-nav" id="uixNav">
+        <a data-sec="sec-summary"><i class="ti ti-layout-dashboard"></i> サマリー</a>
+        <a data-sec="sec-forecast"><i class="ti ti-target"></i> 推移・着地予想</a>
+        <a data-sec="sec-bridge"><i class="ti ti-chart-bar"></i> ARR増減・継続率</a>
+        <a data-sec="sec-compare"><i class="ti ti-users"></i> チーム・メンバー</a>
+        <a data-sec="sec-renewal"><i class="ti ti-calendar-due"></i> 満了・解約</a>
+        <a data-sec="sec-sheet"><i class="ti ti-table"></i> 集計表</a>
+      </nav>
+      <div class="uix-menu" id="uixMenu">
+        <button type="button" class="uix-btn" id="btnMenu"><i class="ti ti-list-details"></i> 詳細メニュー <i class="ti ti-chevron-down"></i></button>
+        <div class="uix-pop">
+          <div class="uix-grp">着地予想</div>
+          <a data-go="sec-forecast"><i class="ti ti-target"></i> 着地予想とアップサイド <span>Min／Mid／Max</span></a>
+          <a data-go="sec-defs"><i class="ti ti-percentage"></i> 解約確率の設定 <span>危険は月数で変動</span></a>
+          <div class="uix-grp">一覧</div>
+          <a data-go="sec-renewal" data-chip="follow"><i class="ti ti-alert-triangle"></i> 要フォロー（危険・不明・未入力）</a>
+          <a data-go="sec-renewal" data-chip="churn"><i class="ti ti-user-x"></i> 解約した契約</a>
+          <div class="uix-grp">その他</div>
+          <a href="https://docs.google.com/spreadsheets/d/1T1zGzRa5miRM6hYFGFHULn4iejL5oOtlcTxX0apJ308/edit?usp=sharing" target="_blank" rel="noopener"><i class="ti ti-table-share"></i> 元データのスプレッドシート</a>
+          <a data-go="sec-defs"><i class="ti ti-book-2"></i> 指標の定義・計算ルール</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <section id="sec-summary" class="uix-sec">
+  <div class="sec-t">ARR</div>
+  <div class="grid g4 ds-rise" id="kArr"></div>
+
+  <div class="sec-t">継続率・チャーン</div>
+  <div class="grid g3 ds-rise" id="kRate"></div>
+
+  <div class="sec-t">拡大（アップセル・クロスセル）と縮小</div>
+  <div class="grid g4 ds-rise" id="kExp"></div>
+
+  </section>
+  <section id="sec-forecast" class="uix-sec">
+  <div class="sec-t">推移と着地予想</div>
+  <div class="grid g2">
+    <div class="card"><h3>月初ARR・月末ARRの推移</h3><div class="cap">棒＝月初ARR・線＝月末ARR（どちらも集計シートと同じ確定分）、点線＝着地 Mid と Min〜Max の幅。月別表示では年度の中で選んだ月を強調</div><div class="chart"><canvas id="cTrend"></canvas></div></div>
+    <div class="card"><h3>着地予想とアップサイド</h3><div class="cap" id="landCap"></div>
+      <div class="land" id="land"></div>
+      <div class="range" id="range"></div>
+      <div class="upside"><div><div style="font-size:12px;font-weight:700">アップサイド（Max − Mid）</div><div style="font-size:11px;color:var(--ink-faint)">見込が良い方に転んだときの上乗せ</div></div><div class="uv num" id="upside"></div></div>
+      <div id="landMix" style="margin-top:12px"></div>
+    </div>
+  </div>
+
+  </section>
+  <section id="sec-bridge" class="uix-sec">
+  <div class="grid g2e" style="margin-top:14px">
+    <div class="card"><h3>ARRの増減（期間内）</h3><div class="cap">集計シートのARRブリッジと同じ：月初ARR → 新規 → アップセル → ダウンセル → 解約 →（未決着のまま満了・要確認）→ 月末ARR</div><div class="chart"><canvas id="cBridge"></canvas></div></div>
+    <div class="card"><h3>NRR・カスタマーチャーンの推移</h3><div class="cap">月ごと。NRR（左軸）、カスタマーチャーン①（右軸）。月別表示では年度の中で選んだ月を強調</div><div class="chart"><canvas id="cRate"></canvas></div></div>
+  </div>
+
+  </section>
+  <section id="sec-compare" class="uix-sec">
+  <div class="sec-t" id="cmpTitle">チーム比較</div>
+  <div class="card"><div class="cap" id="cmpCap">行をクリックするとその単位に絞り込みます</div><div class="tbl-wrap"><table id="cmp"></table></div></div>
+
+  </section>
+  <section id="sec-renewal" class="uix-sec">
+  <div class="sec-t">この期間に満了する契約・解約した契約</div>
+  <div class="card"><div class="chips" id="riskChips"></div><div class="cap" id="riskCap"></div><div class="risk-wrap"><table id="risk"></table></div></div>
+  </section>
+
+  <section id="sec-sheet" class="uix-sec">
+  <div class="sec-t">集計表（集計シートと同じ並び・同じ計算）</div>
+  <div class="card"><div class="cap" id="sheetCap"></div><div class="tbl-wrap sheet-wrap"><table id="sheetTbl" class="sheet"></table></div></div>
+  </section>
+
+  <div class="note uix-sec" id="sec-defs">
+    <b>指標の定義</b><br>
+    月初ARR＝前月末日に契約中の本体契約ARR合計／月末ARR＝当月末日の合計（期間を選ぶと、最初の月の月初と最後の月の月末）。どちらも集計シートと同じ確定分で、未決着の契約は満了日で抜ける。見込は「着地予想」だけに入れている。<br>
+    NRR＝（月初ARR＋アップセル－ダウンセル－解約）÷月初ARR（＝1－NRC①）。新規は含めない。クロスセルは単発商品のためARRに含めず別掲。<br>レベニューチャーンレート＝（解約＋ダウンセル）÷期間中に更新を迎えた契約の更新前ARR。<br>
+    NRR（更新ベース）＝（更新前ARR＋アップセル－ダウンセル－解約）÷期間中に更新を迎えた契約の更新前ARR（担当替えの影響を受けにくいので、メンバー比較はこちらを推奨）。<br>NRC①＝（解約＋ダウンセル－アップセル）÷月初ARR（＝1－NRR）／NRC②＝同じ分子 ÷ 期間中に更新を迎えた契約の更新前ARR。<br>
+    カスタマーチャーン①＝解約ID数 ÷ 更新対象ID数／②＝解約ID数 ÷ 月初に契約中のID数（かんりくん企業ID単位）。<br>
+    解約の担当者＝満了した契約の「CS管理の担当者」（補正シートで上書き可）。解約後の所有者の付け替えに引きずられないようにしている。このため<b>チーム・メンバー単位の解約は集計シート（発生日時点の所有者）と違う</b>。全体・CS・PSは集計シートと同じ。<br>
+    着地予想＝期間末の確定ARR＋未決着の契約のARR×（1－解約確率）。更新予定＝0%、危険＝満了までの月数で 1か月85%・3か月50%・6か月以上30%（間は直線）、不明・未入力＝Min 80%／Mid 50%／Max 30%。更新時の増減と新規は見込まない。<br>
+    ※ 担当替えがあると、メンバー・チーム単位では「月初＋増減≠月末」になることがある（差は「担当替え等」）。
+  </div>
+</div>
+
+<script>
+// ============================================================
+// ★ 設定（GASをデプロイしたら、この2行だけ書き換える）
+//   CS_GAS_URL  ：GASの「ウェブアプリ」のURL（…/exec）
+//   CS_GAS_TOKEN：GASのスクリプトプロパティ ACCESS_TOKEN と同じ値
+// ============================================================
+const CS_GAS_URL = 'https://script.google.com/a/macros/hr-cloud.co.jp/s/AKfycbyeSLcUXog4QTBaiLr9U53K4N_xgoL32DLPDfSC2bhgag3ujciTilz59Pp2ON_enFPbVg/exec';
+const CS_GAS_TOKEN = 'cs_tok_o-vxVS-uqCNCq1jf';
+
+// ---------- データ取得（IS/FSと同じく失敗時は 1.2秒→3.5秒 で再試行） ----------
+async function loadData(fresh){
+  const url = CS_GAS_URL + '?token=' + encodeURIComponent(CS_GAS_TOKEN) + (fresh ? '&fresh=1' : '') + '&_=' + Date.now();
+  const waits=[0,1200,3500]; let last;
+  for(const w of waits){
+    if(w) { setLoading(`再試行しています…（${w/1000}秒後）`); await new Promise(r=>setTimeout(r,w)); }
+    try{
+      const res = await fetch(url, {redirect:'follow'});
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      const j = await res.json();
+      if(!j.ok) throw new Error(j.error==='forbidden' ? 'トークンが一致しません（CS_GAS_TOKEN と ACCESS_TOKEN を確認）' : j.error);
+      return j.data;
+    }catch(e){ last=e; }
+  }
+  throw last;
+}
+function setLoading(msg){ const el=document.getElementById('loading'); if(!el) return; if(msg===null){ el.remove(); return; } el.querySelector('.lmsg').textContent=msg; }
+(async()=>{
+  try{
+    if(!/^https?:\/\//.test(CS_GAS_URL)) throw new Error('CS_GAS_URL が未設定です（index.html の冒頭に GAS のウェブアプリURLを貼ってください）');
+    const D = await loadData(false); setLoading(null); main(D);
+  }catch(e){ console.error(e); const el=document.getElementById('loading'); el.classList.add('err'); el.querySelector('.lmsg').textContent='データを取得できませんでした：'+(e.message||e); el.querySelector('.lbtn').style.display=''; }
+})();
+
+function main(D){
+const M = D.months, ASOF = D.asof, CUR = ASOF.slice(0,7);
+document.getElementById('asof').textContent = ASOF;
+
+// ---------- 状態 ----------
+const TEAM_ORDER = ['CSM-A','CSM-B','CSM-C','CSM-D','CSM','PS-CS','PS','PS-セールス'];
+const teams = Object.keys(D.meta.teams).sort((a,b)=>{const ia=TEAM_ORDER.indexOf(a),ib=TEAM_ORDER.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b,'ja');});
+const members = Object.keys(D.meta.members).sort((a,b)=>{const ta=D.meta.members[a],tb=D.meta.members[b];const ia=TEAM_ORDER.indexOf(ta),ib=TEAM_ORDER.indexOf(tb);return (ia<0?99:ia)-(ib<0?99:ib)||ta.localeCompare(tb,'ja')||a.localeCompare(b,'ja');});
+const S = { scope:'全体', name:null, period:'月', idx:M.indexOf(CUR), chip:'follow' };
+
+// ---------- 期間 ----------
+function periods(kind){
+  const ym=m=>m.slice(0,4)+'年'+parseInt(m.slice(5))+'月';
+  if(kind==='月') return M.map(m=>({label:parseInt(m.slice(5))+'月',view:ym(m),ms:[m]}));
+  if(kind==='四半期') return [0,1,2,3].map(q=>({label:`Q${q+1}（${['4-6','7-9','10-12','1-3'][q]}月）`,view:`FY2026 Q${q+1}（${['4-6','7-9','10-12','1-3'][q]}月）`,ms:M.slice(q*3,q*3+3)}));
+  if(kind==='半期') return [0,1].map(h=>({label:`${h?'下期':'上期'}（${h?'10-3':'4-9'}月）`,view:`FY2026 ${h?'下期（10-3月）':'上期（4-9月）'}`,ms:M.slice(h*6,h*6+6)}));
+  return [{label:'FY2026（4-3月）',view:'FY2026 通期（4-3月）',ms:M.slice()}];
+}
+function defaultIdx(kind){ const ps=periods(kind); const i=ps.findIndex(p=>p.ms.includes(CUR)); return i<0?0:i; }
+
+// ---------- 集計 ----------
+function unitKey(){ if(S.scope==='全体') return '全体'; if(S.scope==='CS'||S.scope==='PS') return '管轄:'+S.scope; return (S.scope==='チーム'?'チーム:':'メンバー:')+S.name; }
+function calc(key, ms){
+  const U = D.units[key]||{}; const g=(m,k)=>((U[m]||{})[k]||0);
+  const sum=k=>ms.reduce((a,m)=>a+g(m,k),0);
+  const r = { open:g(ms[0],'open'), close:g(ms[ms.length-1],'close'), openIds:g(ms[0],'openIds'),
+    new:sum('new'), up:sum('up'), down:sum('down'), churn:sum('churn'), other:sum('other'), cross:sum('cross'), pending:sum('pending'),
+    upN:sum('upN'), downN:sum('downN'), crossN:sum('crossN'), tgtIds:sum('tgtIds'), tgtArr:sum('tgtArr'), churnIds:sum('churnIds'), renIds:sum('renIds'),
+    pendIds:sum('pendIds'), accts:sum('accts'), renArr:sum('renArr'), renTotal:sum('renTotal') };
+  r.net = r.close - r.open;
+  // 率（集計シート・計算ルールと同じ）
+  r.nrc = r.open ? (r.churn + r.down - r.up)/r.open : null;            // NRC①
+  r.nrr = r.nrc==null ? null : 1 - r.nrc;                               // NRR（期首ARR基準）
+  r.nrc2 = r.tgtArr ? (r.churn + r.down - r.up)/r.tgtArr : null;        // NRC②
+  r.nrr2 = r.nrc2==null ? null : 1 - r.nrc2;                            // NRR（更新ベース）
+  r.rc = r.tgtArr ? (r.churn + r.down)/r.tgtArr : null;                 // レベニューチャーンレート
+  r.cc1 = r.tgtIds ? r.churnIds/r.tgtIds : null;                        // カスタマーチャーンレート①
+  r.cc2 = r.openIds ? r.churnIds/r.openIds : null;                      // カスタマーチャーンレート②
+  // ARRブリッジ：期首＋新規＋US－DS－解約－未決着のまま満了＋要確認の動き＋担当替え＝期末（全体・管轄では担当替え＝0）
+  r.move = r.close - (r.open + r.new + r.up - r.down - r.churn - r.pending + r.other);
+  // 着地予想（期間末）：確定分の期末ARR＋未決着ARR×（1－解約確率）
+  const F = D.forecast[key]||{}; const end = ms[ms.length-1];
+  const fms = Object.keys(F).filter(m=>m<=end);
+  r.future = end >= CUR;
+  r.fc = {}; ['min','mid','max'].forEach(sc=>{ r.fc[sc] = r.close + fms.reduce((a,m)=>a+(F[m].arr||0)-(F[m]['loss_'+sc]||0),0); });
+  r.pend = fms.reduce((a,m)=>a+(F[m].arr||0),0);
+  r.mix = {}; ['更新予定','危険','不明','未入力'].forEach(st=>{ r.mix[st]=fms.reduce((a,m)=>a+(F[m]['arr_'+st]||0),0); });
+  return r;
+}
+
+// ---------- 表示ユーティリティ ----------
+const yen = v => v==null?'—':(Math.abs(v)>=1e8? (v/1e8).toFixed(2)+'億円' : (v/1e4).toLocaleString('ja-JP',{maximumFractionDigits:0})+'万円');
+const man = v => v==null?'—':(v/1e4).toLocaleString('ja-JP',{maximumFractionDigits:0});
+const pct = (v,d=1) => v==null?'—':(v*100).toFixed(d)+'%';
+const sgn = v => (v>0?'+':v<0?'−':'')+yen(Math.abs(v));
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function kpi(k,v,s,cls,help){ return `<div class="kpi-card ${cls||''}"><div class="k">${k}${help?`<span class="help" title="${help}">?</span>`:''}</div><div class="v num">${v}</div><div class="s">${s||''}</div></div>`; }
+
+// ---------- 描画 ----------
+let charts={};
+function render(){
+  const ps=periods(S.period); S.idx=Math.max(0,Math.min(ps.length-1,S.idx)); const P=ps[S.idx];
+  const tagged = P.ms[P.ms.length-1] >= CUR;
+  renderPeriodBar(ps,P);
+  const key=unitKey(); const r=calc(key,P.ms);
+  const pv = S.idx>0 ? calc(key, ps[S.idx-1].ms) : null;
+  const pl = S.period==='月'?'月初':'期首', el = S.period==='月'?'月末':'期末';
+
+  document.getElementById('kArr').innerHTML =
+    kpi(pl+'ARR', yen(r.open), `契約中ID ${r.openIds.toLocaleString()}社`, 'b-brand') +
+    kpi(el+'ARR', yen(r.close), r.pending>0?`未決着のまま満了 ${yen(r.pending)} を除いた確定分（集計シートと同じ）。見込は着地予想へ`:(r.future?'今月末時点（満了未到来）':''), 'b-cyan') +
+    kpi('純増ARR', `<span class="${r.net>=0?'up':'dn'}">${sgn(r.net)}</span>`, `${pl}比 ${r.open?pct(r.net/r.open):'—'}`, r.net>=0?'b-ok':'b-bad') +
+    kpi('新規ARR', yen(r.new), `新規受注分（参考）${Math.abs(r.move)>=1?'<br>担当替え・営業からの引継ぎ '+sgn(r.move):''}`, 'b-brand');
+
+  const d = (a,b,inv) => (a==null||b==null)?'':`<span class="d ${((a-b)>=0)!==!!inv?'up':'dn'}">${(a-b)>=0?'▲':'▼'}${Math.abs((a-b)*100).toFixed(1)}pt</span> 前期間比`;
+  document.getElementById('kRate').innerHTML =
+    kpi('NRR', pct(r.nrr), d(r.nrr,pv&&pv.nrr), r.nrr>=1?'b-ok':'b-warm', '（月初ARR＋アップセル－ダウンセル－解約）÷月初ARR') +
+    kpi('NRR（更新ベース）', pct(r.nrr2), `更新を迎えた契約 ${yen(r.tgtArr)} が基準`, r.nrr2>=1?'b-ok':'b-warm', '（更新前ARR＋アップセル－ダウンセル－解約）÷期間中に更新を迎えた契約の更新前ARR。担当替えの影響を受けにくい') +
+    kpi('NRC', `${pct(r.nrc,2)}<span style="font-size:14px;color:var(--ink-faint);font-weight:600"> ／ ${pct(r.nrc2,1)}</span>`, '① 月初ARR比 ／ ② 更新対象比', 'b-warm', '（解約＋ダウンセル－アップセル）÷ ①月初ARR ②更新を迎えた契約の更新前ARR') +
+    kpi('レベニューチャーン', pct(r.rc), `（解約＋ダウンセル）÷ 更新を迎えた契約 ${yen(r.tgtArr)}`, 'b-bad', '（解約＋ダウンセル）÷期間中に更新を迎えた契約の更新前ARR') +
+    kpi('カスタマーチャーン①', pct(r.cc1), `解約 ${r.churnIds} ／ 更新対象 ${r.tgtIds} ID`, 'b-bad', '解約ID数÷更新対象ID数') +
+    kpi('カスタマーチャーン②', pct(r.cc2,2), `解約 ${r.churnIds} ／ 契約中 ${r.openIds} ID`, 'b-bad', '解約ID数÷月初に契約中のID数') +
+    '';
+
+  document.getElementById('kExp').innerHTML =
+    kpi('アップセル', `<span class="up">${yen(r.up)}</span>`, `${r.upN}件（更新時の増額＋途中追加）`, 'b-ok') +
+    kpi('クロスセル', yen(r.cross), `${r.crossN}件（単発商品・ARR外）`, 'b-cyan') +
+    kpi('ダウンセル', `<span class="dn">${yen(r.down)}</span>`, `${r.downN}件`, 'b-warm') +
+    kpi('拡大 − 縮小', `<span class="${r.up-r.down-r.churn>=0?'up':'dn'}">${sgn(r.up-r.down-r.churn)}</span>`, `アップセル－ダウンセル－解約（解約 ${yen(r.churn)}）`, 'b-brand');
+
+  // 着地予想
+  const end=P.ms[P.ms.length-1];
+  const endLabel = end.replace('-','年')+'月末';
+  if(!r.future){
+    document.getElementById('landCap').textContent = `${endLabel}の実績（確定済みの期間）`;
+    document.getElementById('land').innerHTML = `<div style="grid-column:span 3"><div class="lk">確定ARR</div><div class="lv num">${yen(r.close)}</div></div>`;
+    document.getElementById('range').style.display='none'; document.getElementById('upside').textContent='—'; document.getElementById('landMix').innerHTML='';
+  } else {
+    document.getElementById('range').style.display='';
+    document.getElementById('landCap').textContent = `${endLabel}の着地ARR（未決着 ${yen(r.pend)} の行方で変わる）`;
+    document.getElementById('land').innerHTML = ['min','mid','max'].map(sc=>`<div class="${sc==='mid'?'mid':''}"><div class="lk">${sc.toUpperCase()}</div><div class="lv num">${yen(r.fc[sc])}</div><div style="font-size:11px;color:var(--ink-faint)">${pl}比 ${sgn(r.fc[sc]-r.open)}</div></div>`).join('');
+    const lo=r.close, hi=r.close+r.pend, w=v=>hi>lo?((v-lo)/(hi-lo)*100):50;
+    document.getElementById('range').innerHTML = `<i style="left:${w(r.fc.min)}%;width:${w(r.fc.max)-w(r.fc.min)}%"></i><b style="left:calc(${w(r.fc.mid)}% - 2px)"></b>`;
+    document.getElementById('upside').textContent = '+'+yen(r.fc.max-r.fc.mid);
+    const tot=Object.values(r.mix).reduce((a,b)=>a+b,0)||1; const col={'更新予定':css('--success'),'危険':css('--danger'),'不明':css('--warm'),'未入力':css('--ink-faint')};
+    document.getElementById('landMix').innerHTML = `<div style="font-size:11px;font-weight:700;color:var(--ink-faint);margin-bottom:6px">未決着ARRの更新見込の内訳</div>
+      <div style="display:flex;height:10px;border-radius:9999px;overflow:hidden">${Object.entries(r.mix).map(([k,v])=>`<span style="width:${v/tot*100}%;background:${col[k]}"></span>`).join('')}</div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;font-size:11.5px">${Object.entries(r.mix).map(([k,v])=>`<span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${col[k]};margin-right:4px"></span>${k} ${yen(v)}（${pct(v/tot,0)}）</span>`).join('')}</div>`;
+  }
+
+  drawTrend(key,P); drawBridge(r,pl,el); drawRate(key,P); drawCmp(P); drawRisk(P); drawSheet(key,P);
+}
+
+function baseOpts(){ return { responsive:true, maintainAspectRatio:false, animation:{duration:500},
+  plugins:{ legend:{labels:{color:css('--axis'),boxWidth:10,font:{size:11}}}, tooltip:{} },
+  scales:{ x:{grid:{display:false},ticks:{color:css('--axis'),font:{size:10.5}}}, y:{grid:{color:css('--grid')},ticks:{color:css('--axis'),font:{size:10.5}}} } }; }
+function mk(id,cfg){ if(charts[id]) charts[id].destroy(); charts[id]=new Chart(document.getElementById(id),cfg); }
+
+function drawTrend(key,P){
+  // 月別は年度の中で選んだ月を強調。四半期・半期・年間はその期間の月だけを表示
+  const SH = P.ms.length>1 ? P.ms : M, on = m => P.ms.includes(m);
+  const ci=M.indexOf(CUR); const mo=M.map(m=>calc(key,[m])); const ix=SH.map(m=>M.indexOf(m));
+  const fcv = sc => ix.map(i=> i<ci-1?null : i===ci-1? mo[i].close/1e8 : calc(key,M.slice(0,i+1)).fc[sc]/1e8);
+  const o=baseOpts(); o.scales.y.beginAtZero=false; o.scales.y.ticks.callback=v=>v.toFixed(1)+'億';
+  o.plugins.tooltip.callbacks={label:c=>c.raw==null?'':`${c.dataset.label}: ${c.raw.toFixed(2)}億円`};
+  o.plugins.legend.labels.filter=it=>it.text!=='着地 Min';
+  const fade = (m,c) => on(m) ? c : c.replace(/[\d.]+\)$/,'0.10)');
+  mk('cTrend',{ data:{ labels:SH.map(m=>parseInt(m.slice(5))+'月'), datasets:[
+    {type:'bar',label:'月初ARR',data:ix.map(i=>mo[i].open/1e8),backgroundColor:ix.map((i,k)=>fade(SH[k], i>ci?'rgba(217,140,74,.30)':'rgba(58,120,181,.40)')),borderRadius:6,order:3},
+    {type:'line',label:'月末ARR（確定分）',data:ix.map(i=>mo[i].close/1e8),borderColor:css('--brand'),backgroundColor:css('--brand'),tension:.3,pointRadius:SH.map(m=>on(m)?5:2),order:1},
+    {type:'line',label:'着地 Min〜Max',data:fcv('max'),borderColor:'rgba(47,158,138,.5)',borderWidth:1,backgroundColor:'rgba(47,158,138,.22)',pointRadius:0,fill:'+1',tension:.3,order:2},
+    {type:'line',label:'着地 Min',data:fcv('min'),borderColor:'rgba(217,101,92,.5)',borderWidth:1,pointRadius:0,fill:false,tension:.3,order:2},
+    {type:'line',label:'着地 Mid',data:fcv('mid'),borderColor:css('--warm'),borderDash:[6,4],pointRadius:SH.map(m=>on(m)?5:2),backgroundColor:css('--warm'),tension:.3,order:1}
+  ]}, options:o });
+}
+
+function drawBridge(r,pl,el){
+  const steps=[[pl+'ARR',r.open,'base'],['新規',r.new,'+'],['アップセル',r.up,'+'],['ダウンセル',-r.down,'-'],['解約',-r.churn,'-']];
+  if(r.pending>1) steps.push(['未決着のまま満了',-r.pending,'-']);
+  if(Math.abs(r.other)>1) steps.push(['要確認',r.other,r.other>=0?'+':'-']);
+  if(Math.abs(r.move)>=1) steps.push(['担当替え・引継ぎ',r.move,r.move>=0?'+':'-']);
+  steps.push([el+'ARR',r.close,'base']);
+  let acc=0; const data=[], colors=[];
+  steps.forEach(([l,v,t])=>{ if(t==='base'){ data.push([0,v/1e4]); acc=v; colors.push(css('--brand-mid')); } else { data.push([acc/1e4,(acc+v)/1e4]); acc+=v; colors.push(v>=0?css('--success'):css('--danger')); } });
+  const o=baseOpts(); o.plugins.legend.display=false;
+  const mn=Math.min(...data.map(d=>Math.min(...d))), mx=Math.max(...data.map(d=>Math.max(...d)));
+  o.scales.y.min=Math.max(0,Math.floor((mn-(mx-mn)*0.6)/1000)*1000);
+  o.scales.y.ticks.callback=v=>(v/1e4).toFixed(2)+'億';
+  o.plugins.tooltip.callbacks={label:c=>{const s=steps[c.dataIndex]; return `${s[0]}: ${s[2]==='base'?yen(s[1]):sgn(s[1])}`;}};
+  mk('cBridge',{type:'bar',data:{labels:steps.map(s=>s[0]),datasets:[{data,backgroundColor:colors,borderRadius:6,borderSkipped:false}]},options:o});
+}
+
+function drawRate(key,P){
+  const SH = P.ms.length>1 ? P.ms : M, on = m => P.ms.includes(m); const mo=SH.map(m=>calc(key,[m]));
+  const o=baseOpts(); o.scales.y={...o.scales.y,position:'left',ticks:{color:css('--axis'),callback:v=>v.toFixed(1)+'%'}};
+  o.scales.y2={position:'right',grid:{display:false},ticks:{color:css('--axis'),callback:v=>v.toFixed(0)+'%'}};
+  o.plugins.tooltip.callbacks={label:c=>c.raw==null?'':`${c.dataset.label}: ${c.raw.toFixed(1)}%`};
+  mk('cRate',{type:'line',data:{labels:SH.map(m=>parseInt(m.slice(5))+'月'),datasets:[
+    {label:'NRR',data:mo.map(x=>x.nrr==null?null:x.nrr*100),borderColor:css('--brand-mid'),backgroundColor:css('--brand-mid'),tension:.3,yAxisID:'y',pointRadius:SH.map(m=>on(m)?5:2)},
+    {label:'カスタマーチャーン①',data:mo.map((x,k)=>x.cc1==null||SH[k]>CUR?null:x.cc1*100),borderColor:css('--danger'),backgroundColor:css('--danger'),borderDash:[5,4],tension:.3,yAxisID:'y2',pointRadius:SH.map(m=>on(m)?5:2)}
+  ]},options:o});
+}
+
+function drawCmp(P){
+  let rows, title;
+  if(S.scope==='チーム'){ rows=members.filter(m=>D.meta.members[m]===S.name).map(m=>['メンバー',m]); title=`${S.name} のメンバー比較`; }
+  else if(S.scope==='メンバー'){ const t=D.meta.members[S.name]; rows=members.filter(m=>D.meta.members[m]===t).map(m=>['メンバー',m]); title=`${t} のメンバー比較`; }
+  else { const ts=teams.filter(t=>S.scope==='全体'||D.meta.teams[t].juris===S.scope); rows=ts.map(t=>['チーム',t]); title=(S.scope==='全体'?'チーム比較':S.scope+'のチーム比較'); }
+  document.getElementById('cmpTitle').textContent=title;
+  const data=rows.map(([k,n])=>({k,n,r:calc((k==='チーム'?'チーム:':'メンバー:')+n,P.ms)})).filter(x=>x.r.open||x.r.close||x.r.churn||x.r.up);
+  const maxO=Math.max(...data.map(x=>x.r.open),1);
+  const fut=P.ms[P.ms.length-1]>=CUR;
+  const h=`<thead><tr><th>${rows[0]?rows[0][0]:''}</th><th>月初ARR</th><th>月末ARR</th><th>NRR</th><th>NRR（更新）</th><th>NRC①</th><th>チャーン①</th><th>アップセル</th><th>クロスセル</th><th>解約</th>${fut?'<th>着地 Mid</th><th>アップサイド</th>':''}</tr></thead>`;
+  const b=data.map(({k,n,r})=>`<tr data-k="${k}" data-n="${n}" class="${S.name===n?'sel':''}"><td><b>${n}</b>${k==='チーム'?`<span style="color:var(--ink-faint);font-size:11px;margin-left:6px">${D.meta.teams[n].juris}</span>`:''}</td>
+    <td class="num"><span class="bar-cell" style="width:${r.open/maxO*60}px"></span>${man(r.open)}</td><td class="num">${man(r.close)}</td>
+    <td class="num ${r.nrr!=null&&r.nrr>=1?'up':''}">${pct(r.nrr)}</td><td class="num ${r.nrr2!=null&&r.nrr2>=1?'up':''}">${pct(r.nrr2)}</td><td class="num">${pct(r.nrc,2)}</td>
+    <td class="num ${r.cc1>0.15?'dn':''}">${pct(r.cc1)}<span style="color:var(--ink-faint);font-size:10.5px"> ${r.churnIds}/${r.tgtIds}</span></td>
+    <td class="num up">${man(r.up)}<span style="color:var(--ink-faint);font-size:10.5px"> ${r.upN}件</span></td><td class="num">${man(r.cross)}<span style="color:var(--ink-faint);font-size:10.5px"> ${r.crossN}件</span></td>
+    <td class="num dn">${man(r.churn)}</td>${fut?`<td class="num">${man(r.fc.mid)}</td><td class="num up">+${man(r.fc.max-r.fc.mid)}</td>`:''}</tr>`).join('');
+  document.getElementById('cmp').innerHTML=h+'<tbody>'+b+'</tbody>';
+  document.getElementById('cmpCap').textContent='金額は万円。行をクリックするとその単位に絞り込みます';
+  document.querySelectorAll('#cmp tbody tr').forEach(tr=>tr.onclick=()=>{ S.scope=tr.dataset.k; S.name=tr.dataset.n; syncScope(); render(); jump('sec-summary'); });
+}
+
+const pd = mo => mo<=1?.85: mo>=6?.30: mo<=3? .85+(.50-.85)*(mo-1)/2 : .50+(.30-.50)*(mo-3)/3;
+function inScope(x){ return S.scope==='全体' || (S.scope==='CS'||S.scope==='PS'? x.juris===S.scope : S.scope==='チーム'? x.team===S.name : x.member===S.name); }
+function drawRisk(P){
+  const inP = x => P.ms.includes(x.end.slice(0,7));
+  const pend = D.risk.filter(x=>inScope(x)&&inP(x));
+  const ch = D.churns.filter(x=>inScope(x)&&P.ms.includes(x.m));
+  const isPlan = x => x.st==='更新予定'||x.st==='継続更新予定';
+  const groups = { follow:{lb:'要フォロー（危険・不明・未入力）',rows:pend.filter(x=>!isPlan(x))},
+    plan:{lb:'更新予定',rows:pend.filter(isPlan)}, churn:{lb:'解約した契約',rows:ch} };
+  if(!groups[S.chip]) S.chip='follow';
+  document.getElementById('riskChips').innerHTML = Object.entries(groups).map(([k,g])=>`<button class="chip ${S.chip===k?'on':''}" data-c="${k}">${g.lb} ${g.rows.length}</button>`).join('');
+  document.querySelectorAll('#riskChips .chip').forEach(b=>b.onclick=()=>{ S.chip=b.dataset.c; drawRisk(P); });
+  const list = groups[S.chip].rows.slice().sort((a,b)=>a.end.localeCompare(b.end)||b.arr-a.arr);
+  const tot=list.reduce((a,x)=>a+x.arr,0); const pv = x => x.st==='危険'?pd(x.mo): isPlan(x)?0:.5;
+  const cls={'危険':'p-danger','不明':'p-warn','未入力':'p-gray','更新予定':'p-ok','継続更新予定':'p-ok'};
+  const link = x => x.url?`<a href="${x.url}" target="_blank" rel="noopener">HubSpot</a>`:'';
+  if(S.chip==='churn'){
+    document.getElementById('riskCap').innerHTML = `${P.view}に計上した解約 ${list.length}件・ARR ${yen(tot)}。担当は満了した契約のCS管理の担当者`;
+    document.getElementById('risk').innerHTML = list.length? `<thead><tr><th>企業</th><th>担当</th><th>チーム</th><th>満了日</th><th>計上月</th><th>解約ARR（万円）</th><th></th></tr></thead><tbody>`+
+      list.map(x=>`<tr><td>${x.name||x.id}</td><td>${x.member}</td><td>${x.team}</td><td class="num">${x.end}</td><td class="num">${x.m}</td><td class="num dn">${man(x.arr)}</td><td>${link(x)}</td></tr>`).join('')+'</tbody>'
+      : '<tbody><tr><td style="color:var(--ink-faint)">この期間に解約した契約はありません</td></tr></tbody>';
+    return;
+  }
+  const exp=list.reduce((a,x)=>a+x.arr*pv(x),0);
+  document.getElementById('riskCap').innerHTML = `${P.view}に満了する未決着の契約 ${list.length}件・ARR ${yen(tot)}（Midで見込む解約 ${yen(exp)}）。満了日の近い順`;
+  document.getElementById('risk').innerHTML = list.length? `<thead><tr><th>企業</th><th>担当</th><th>チーム</th><th>満了日</th><th>あと</th><th>更新見込</th><th>ARR（万円）</th><th>解約確率（Mid）</th><th></th></tr></thead><tbody>`+
+    list.map(x=>`<tr><td>${x.name||x.id}</td><td>${x.member}</td><td>${x.team}</td><td class="num">${x.end}</td><td class="num">${x.mo.toFixed(1)}か月</td><td><span class="pill ${cls[x.st]||'p-gray'}">${x.st}</span></td><td class="num">${man(x.arr)}</td><td class="num">${pct(pv(x),0)}</td><td>${link(x)}</td></tr>`).join('')+'</tbody>'
+    : `<tbody><tr><td style="color:var(--ink-faint)">${P.ms[P.ms.length-1]<CUR?'この期間に満了した契約はすべて決着済みです（「解約した契約」で結果を確認できます）':'該当する契約はありません'}</td></tr></tbody>`;
+}
+
+function drawSheet(key,P){
+  const cols = M.map(m=>({k:m,l:parseInt(m.slice(5))+'月',ms:[m]}))
+    .concat([0,1,2,3].map(q=>({k:'Q'+(q+1),l:'Q'+(q+1),ms:M.slice(q*3,q*3+3),sep:q===0})))
+    .concat([{k:'H1',l:'上期',ms:M.slice(0,6),sep:true},{k:'H2',l:'下期',ms:M.slice(6)},{k:'Y',l:'年度',ms:M.slice(),sep:true}]);
+  const same = c => c.ms.length===P.ms.length && c.ms[0]===P.ms[0];
+  const R = cols.map(c=>calc(key,c.ms));
+  const z = s => s.replace(/^-(0(\.0+)?)(%?)$/,'$1$3');
+  const n0 = v => v==null?'—':(Math.round(v)||0).toLocaleString('ja-JP');
+  const c0 = v => v==null?'—':String(Math.round(v)||0);   // 社数はカンマなし（集計シートと同じ）
+  const p1 = v => v==null?'—':z((v*100).toFixed(1))+'%';
+  const r1 = v => { const x=v/100; return Math.sign(x)*Math.round(Math.abs(x))/10; };  // 千円・小数1桁（スプレッドシートのROUNDと同じく0から遠い方へ丸める）
+  const k1 = v => z((Math.round(v*10)/10).toLocaleString('ja-JP',{minimumFractionDigits:1,maximumFractionDigits:1}));
+  const rows = [
+    ['社数'],
+    ['更新対象ID数',r=>r.tgtIds,c0],['更新ID数',r=>r.renIds,c0],['解約ID数',r=>r.churnIds,c0],['未決着ID数',r=>r.pendIds,c0],
+    ['期首に契約中のID数（参考）',r=>r.openIds,c0],['更新アカウント数',r=>r.accts,c0],['アップセル件数',r=>r.upN,c0],['ダウンセル件数',r=>r.downN,c0],['クロスセル件数',r=>r.crossN,c0],
+    ['金額（ARR）'],
+    ['期首ARR',r=>r.open,n0],['新規ARR',r=>r.new,n0],['アップセルARR合計（更新時＋途中追加）',r=>r.up,n0],['ダウンセルARR合計',r=>-r.down,n0],
+    ['解約金額',r=>r.churn,n0],['未決着のまま満了',r=>r.pending,n0],['要確認（CS管理と会計が食い違う）のARRの動き',r=>r.other,n0],['期末ARR',r=>r.close,n0],
+    ['担当替え・所属替えによる移動（全体なら常に0）',r=>r.move,n0],
+    ['金額（その他）'],
+    ['単月の更新金額',r=>r.renArr,n0],['契約更新の合計金額',r=>r.renTotal,n0],['アップセルの合計金額',r=>r.up,n0],['クロスセルの合計金額',r=>r.cross,n0],['更新対象の更新前ARR合計',r=>r.tgtArr,n0],
+    ['率'],
+    ['カスタマーチャーンレート①',r=>r.cc1,p1],['カスタマーチャーンレート②',r=>r.cc2,p1],['レベニューチャーンレート',r=>r.rc,p1],['NRC①',r=>r.nrc,p1],['NRC②',r=>r.nrc2,p1],['NRR（＝1－NRC①）',r=>r.nrr,p1],
+    ['経営報告用 MRR増減（千円・小数1桁）'],
+    ['解約MRR',r=>k1(r1(-r.churn/12)),null],['USMRR',r=>k1(r1(r.up/12)),null],['DSMRR',r=>k1(r1(-r.down/12)),null],['新規MRR',r=>k1(r1(r.new/12)),null],
+    ['純増減MRR',r=>k1(r1(r.new/12)+r1(r.up/12)+r1(-r.down/12)+r1(-r.churn/12)),null]
+  ];
+  const head = `<thead><tr><th>期間キー</th>${cols.map(c=>`<th class="${same(c)?'hl':''} ${c.sep?'sep':''}">${c.l}</th>`).join('')}</tr></thead>`;
+  const body = rows.map(row=>{
+    if(row.length===1) return `<tr class="grp"><td colspan="${cols.length+1}">${row[0]}</td></tr>`;
+    const [lb,f,fmt]=row;
+    return `<tr><td>${lb}</td>${R.map((r,i)=>{ const v=f(r); return `<td class="num ${same(cols[i])?'hl':''} ${cols[i].sep?'sep':''}">${fmt?fmt(v):v}</td>`; }).join('')}</tr>`;
+  }).join('');
+  document.getElementById('sheetTbl').innerHTML = head+'<tbody>'+body+'</tbody>';
+  const who = S.scope==='全体'?'全体':(S.scope==='CS'||S.scope==='PS')?'管轄 '+S.scope:S.name;
+  document.getElementById('sheetCap').innerHTML = `対象：<b>${who}</b>。集計シートの「管轄を選ぶ／単位を選ぶ／名前を選ぶ」で同じものを選ぶと同じ値になります（チーム・メンバーは解約の担当者の扱いだけ違う。下の注記）。選んだ期間の列を強調`;
+}
+
+// ---------- コントロール（IS/FSの固定バーと同じ動き）----------
+function renderPeriodBar(ps,P){
+  document.getElementById('segPeriod').innerHTML = [['月','月別'],['四半期','四半期'],['半期','半期'],['年','年間']].map(([v,l])=>`<button class="tab-btn ${S.period===v?'tab-active':'tab-inactive'}" data-v="${v}">${l}</button>`).join('');
+  document.querySelectorAll('#segPeriod button').forEach(b=>b.onclick=()=>{ S.period=b.dataset.v; S.idx=defaultIdx(S.period); render(); });
+  document.getElementById('periodTabs').innerHTML = ps.map((p,i)=>`<button class="tab-btn tab-sm ${i===S.idx?'tab-active':'tab-inactive'} ${p.ms.includes(CUR)?'uix-today':''}" data-i="${i}">${p.label}</button>`).join('');
+  document.querySelectorAll('#periodTabs button').forEach(b=>b.onclick=()=>{ S.idx=+b.dataset.i; render(); });
+  const v=document.getElementById('uixViewing'); const hasToday=P.ms.includes(CUR);
+  if(hasToday){ v.className='uix-viewing'; v.innerHTML=`<i class="ti ti-eye"></i> 表示中：${P.view}（${S.period==='月'?'今月':'今月を含む期間'}）`; }
+  else { v.className='uix-viewing uix-past'; v.innerHTML=`<i class="ti ti-alert-triangle"></i> 表示中：${P.view}（${P.ms[0]>CUR?'見込のみ':'今月ではありません'}）<a id="goToday">今月へ戻る</a>`; document.getElementById('goToday').onclick=goToday; }
+}
+function goToday(){ S.idx=defaultIdx(S.period); render(); }
+document.getElementById('btnToday').onclick=goToday;
+function syncScope(){
+  const el=document.getElementById('segScope');
+  el.innerHTML=['全体','CS','PS'].map(o=>`<button class="${o===S.scope?'uix-seg-on':''}" data-v="${o}">${o}</button>`).join('');
+  el.querySelectorAll('button').forEach(b=>b.onclick=()=>{ S.scope=b.dataset.v; S.name=null; syncScope(); render(); });
+  const sel=document.getElementById('selWho');
+  const order=TEAM_ORDER.concat(teams.filter(t=>!TEAM_ORDER.includes(t)));
+  const cur = (S.scope==='チーム'||S.scope==='メンバー') ? S.scope+':'+S.name : '';
+  sel.innerHTML = `<option value="">チーム・メンバー：全員</option><optgroup label="チーム">${order.filter(t=>teams.includes(t)).map(t=>`<option value="チーム:${t}">${t}</option>`).join('')}</optgroup>`+
+    order.map(t=>{const ms=members.filter(m=>D.meta.members[m]===t); return ms.length?`<optgroup label="メンバー（${t}）">${ms.map(m=>`<option value="メンバー:${m}">${m}</option>`).join('')}</optgroup>`:'';}).join('');
+  sel.value=cur; sel.classList.toggle('on',!!cur);
+}
+document.getElementById('selWho').onchange=e=>{ const v=e.target.value; if(!v){ S.scope='全体'; S.name=null; } else { const i=v.indexOf(':'); S.scope=v.slice(0,i); S.name=v.slice(i+1); } syncScope(); render(); };
+document.querySelectorAll('#uixNav a').forEach(a=>a.onclick=()=>jump(a.dataset.sec));
+function jump(id){ const el=document.getElementById(id); if(!el) return; const h=document.getElementById('uixBar').offsetHeight; window.scrollTo({top:el.getBoundingClientRect().top+scrollY-h-12,behavior:'smooth'}); }
+function spy(){ const h=document.getElementById('uixBar').offsetHeight+30; let act=null; document.querySelectorAll('#uixNav a').forEach(a=>{ const el=document.getElementById(a.dataset.sec); if(el&&el.getBoundingClientRect().top<=h) act=a; }); document.querySelectorAll('#uixNav a').forEach(a=>a.classList.toggle('uix-act',a===act)); }
+addEventListener('scroll',spy,{passive:true});
+document.getElementById('btnMenu').onclick=e=>{ e.stopPropagation(); document.getElementById('uixMenu').classList.toggle('uix-open'); };
+document.addEventListener('click',()=>document.getElementById('uixMenu').classList.remove('uix-open'));
+document.querySelectorAll('#uixMenu .uix-pop a[data-go]').forEach(a=>a.onclick=()=>{ if(a.dataset.chip){ S.chip=a.dataset.chip; render(); } jump(a.dataset.go); });
+document.getElementById('btnRefresh').onclick=async e=>{
+  const b=e.currentTarget; b.disabled=true; b.innerHTML='<i class="ti ti-loader-2"></i> 更新中…';
+  try{ await loadData(true); location.reload(); }catch(err){ alert('データ更新に失敗しました：'+(err.message||err)); b.disabled=false; b.innerHTML='<i class="ti ti-refresh"></i> データ更新'; }
+};
+const _bt = D.meta.builtAt ? new Date(D.meta.builtAt) : null;
+document.getElementById('dataStatus').textContent = `${D.meta.nContracts.toLocaleString()}契約（スプシ更新: ${D.meta.updated || (_bt ? _bt.toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '—')}）`;
+const root=document.documentElement;
+try{ const t=localStorage.getItem('cs-dash-theme'); if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches)) root.classList.add('dark'); }catch(e){}
+document.getElementById('theme').onclick=()=>{ root.classList.toggle('dark'); try{localStorage.setItem('cs-dash-theme',root.classList.contains('dark')?'dark':'light');}catch(e){} render(); };
+syncScope(); render(); spy();
+}
+</script>
+</body>
+</html>
