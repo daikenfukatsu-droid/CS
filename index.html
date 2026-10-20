@@ -286,6 +286,7 @@
         <a data-sec="sec-forecast"><i class="ti ti-target"></i> 推移・着地予想</a>
         <a data-sec="sec-bridge"><i class="ti ti-chart-bar"></i> ARR増減・継続率</a>
         <a data-sec="sec-compare"><i class="ti ti-users"></i> チーム・メンバー</a>
+        <a data-sec="sec-activity"><i class="ti ti-activity"></i> 行動量</a>
         <a data-sec="sec-renewal"><i class="ti ti-calendar-due"></i> 満了・解約</a>
         <a data-sec="sec-sheet"><i class="ti ti-table"></i> 集計表</a>
       </nav>
@@ -349,6 +350,14 @@
   <div class="card"><div class="cap" id="cmpCap">行をクリックするとその単位に絞り込みます</div><div class="tbl-wrap"><table id="cmp"></table></div></div>
 
   </section>
+  <section id="sec-activity" class="uix-sec">
+  <div class="sec-t" id="hAct">行動量</div>
+  <div class="grid g4 ds-rise" id="kAct"></div>
+  <div class="grid g2e" style="margin-top:14px">
+    <div class="card"><h3>月ごとの行動量</h3><div class="cap" id="actCap">ミーティング・通話・メールの件数（HubSpot）。選んだ期間の月を強調</div><div class="chart"><canvas id="cAct"></canvas></div></div>
+    <div class="card"><h3 id="actTblTitle">メンバー別</h3><div class="cap">行をクリックするとそのメンバーに絞り込みます</div><div class="tbl-wrap"><table id="actTbl"></table></div></div>
+  </div>
+  </section>
   <section id="sec-renewal" class="uix-sec">
   <div class="sec-t" id="hRisk">この期間の更新・解約</div>
   <div class="card"><div class="chips" id="riskChips"></div><div class="cap" id="riskCap"></div><div class="risk-wrap"><table id="risk"></table></div></div>
@@ -367,6 +376,7 @@
     カスタマーチャーン①＝解約ID数 ÷ 更新対象ID数／②＝解約ID数 ÷ 月初に契約中のID数（かんりくん企業ID単位）。<br>
     解約の担当者＝満了した契約の「CS管理の担当者」（補正シートで上書き可）。解約後の所有者の付け替えに引きずられないようにしている。このため<b>チーム・メンバー単位の解約は集計シート（発生日時点の所有者）と違う</b>。全体・CS・PSは集計シートと同じ。<br>
     着地予想＝期間末の確定ARR＋未決着の契約のARR×（1－解約確率）。更新予定＝0%、危険＝満了までの月数で 1か月85%・3か月50%・6か月以上30%（間は直線）、不明・未入力＝Min 80%／Mid 50%／Max 30%。更新時の増減と新規は見込まない。<br>
+    行動量＝HubSpotのミーティング（キャンセル・日程変更・ノーショー・未来の予定を除く）・通話（すべて。つながった＝結果「接続済み」か通話時間30秒以上）・メール（送信・転送）の件数。出典は行動管理シートの集計_月次（毎時更新）。チームはその月のチーム定義で振り分け。CTSとしての活動とCSに来る前の活動は含めない。<br>
     ※ 担当替えがあると、メンバー・チーム単位では「月初＋増減≠月末」になることがある（差は「担当替え等」）。
   </div>
 </div>
@@ -553,7 +563,7 @@ function render(){
   const expR = e0===e1 ? `${e0}満了` : `${e0}〜${e1}満了`;
   const span = `<span style="font-weight:500;color:var(--ink-faint);letter-spacing:0;margin-left:6px">`;
   document.getElementById('hArr').innerHTML = `${sh}のARR${span}${P.view}／${od}時点 → ${cd}時点</span>`;
-  document.getElementById('hRen').innerHTML = `${renT}の進捗（社数・金額）<span class="cseg"><button data-cohort="ex" class="${S.cohort==='ex'?'on':''}">期首からの顧客だけ</button><button data-cohort="all" class="${S.cohort==='all'?'on':''}">今期の新規顧客も含む</button></span>${span}${renT}＝CS管理シートで利用終了日が ${+P.ms[0].slice(0,4)}/${+P.ms[0].slice(5)}/1〜${cd} の行（${od}時点で対象が決まる）</span>`;
+  document.getElementById('hRen').innerHTML = `${renT}の進捗（社数・金額）<span class="cseg"><button data-cohort="ex" class="${S.cohort==='ex'?'on':''}">期首からの顧客だけ</button><button data-cohort="all" class="${S.cohort==='all'?'on':''}">今期の新規顧客も含む</button></span>${span}${renT}＝利用終了日（満了）が ${+P.ms[0].slice(0,4)}/${+P.ms[0].slice(5)}/1〜${cd} の契約（${od}時点で対象が決まる）</span>`;
   document.getElementById('hRate').innerHTML = `${sh}の継続率・チャーン${span}${P.view}／集計シートと同じ計上月（更新・解約は満了日の翌月に計上）</span>`;
   document.getElementById('hExp').innerHTML = `${sh}の拡大（アップセル・クロスセル）と縮小${span}${P.view}</span>`;
   document.getElementById('hRisk').innerHTML = `${renT}の契約一覧${span}利用終了日が ${+P.ms[0].slice(0,4)}/${+P.ms[0].slice(5)}/1〜${cd}</span>`;
@@ -581,13 +591,13 @@ function render(){
   const mixHtml = Object.entries(X.mix).filter(([k,v])=>v.n).map(([k,v])=>`<span class="mixp ${({'更新予定':'p-ok','危険':'p-danger','不明':'p-warn','未入力':'p-gray'})[k]}">${k} ${v.n}</span>`).join('');
   document.getElementById('kRen').innerHTML =
     kpi(`${renT}の対象`, big(X.n,X.arr), `${od}時点で決まっている更新前ARR<br>決着 ${nn(X.decN)}社＋未確定 ${nn(X.pendN)}社${X.myN?`<br>（複数年契約の途中 ${nn(X.myN)}社・${mn(X.myArr)}は除外）`:''}`, 'b-brand',
-      tip(`${renT}の対象`, `CS管理シートで利用終了日が ${rs}〜${re} の行`, `社数 = ${nn(X.n)}社\n金額（更新前ARR）= ${yen(X.arr)}`,
-        `CS管理シートの1行＝1件の更新（契約DBの「CS管理との突合（CS管理の行）」タブ）。決着・担当者はCS管理の値、金額は結びついた契約（会計）の更新前ARR。複数年契約はCS管理では1行（利用終了日＝最後の年）なので、途中の年は対象にならない。社数はかんりくん企業ID単位`)) +
+      tip(`${renT}の対象`, `利用終了日（満了）が ${rs}〜${re} の契約`, `社数 = ${nn(X.n)}社\n金額（更新前ARR）= ${yen(X.arr)}`,
+        `ARR増減の明細の印（印_更新対象・印_更新・印_解約・印_未決着）で数える。明細の計上月は満了の翌月なので、その前月＝満了月で数える（集計シートの翌月の列と同じ値）。決着＝明細の採用する種類、金額＝明細の更新前ARR・更新後ARR。複数年契約の途中（継続（申込みの途中））は対象外。社数はかんりくん企業ID単位`)) +
     kpi(`${renT}の確定`, big(X.renN,X.renPost,'var(--success)'), `更新前 ${yen(X.renPre)} → 更新後 ${yen(X.renPost)}<br>更新率 ${pct(X.rateN)}（社数）／${pct(X.rateA)}（金額）`, 'b-ok',
       tip(`${renT}の確定（更新）`, '更新後ARR ＝ 更新前ARR ＋ アップセル － ダウンセル', `= ${mn(X.renPre)} ＋ ${mn(X.up)} － ${mn(X.down)} = ${yen(X.renPost)}`,
-        `内訳：増減なし ${nn(X.flatN)}社／アップセル ${nn(X.upN)}社 +${mn(X.up)}／ダウンセル ${nn(X.downN)}社 −${mn(X.down)}。決着はDBの更新状況（採用）＝CS管理の決着（空なら会計の判定）`)) +
+        `内訳：増減なし ${nn(X.flatN)}社／アップセル ${nn(X.upN)}社 +${mn(X.up)}／ダウンセル ${nn(X.downN)}社 −${mn(X.down)}。決着はARR増減の明細の採用する種類`)) +
     kpi(`${renT}の解約`, big(X.churnN,X.churn,'var(--danger)'), `解約率 ${pct(X.n?X.churnN/X.n:null)}（社数）／${pct(X.arr?X.churn/X.arr:null)}（金額）`, 'b-bad',
-      tip(`${renT}の解約`, '解約が決まった契約の更新前ARR', `社数 = ${nn(X.churnN)}社\n金額 = ${yen(X.churn)}`, 'CS管理シートの決着が「解約」の行（会計上の確定を待たない）')) +
+      tip(`${renT}の解約`, '解約が決まった契約の更新前ARR', `社数 = ${nn(X.churnN)}社\n金額 = ${yen(X.churn)}`, 'ARR増減の明細で解約になった契約（印_解約）。担当は満了した契約のCS管理の担当者')) +
     kpi(`${renT}の未確定`, big(X.pendN,X.pend,'var(--warm)'), mixHtml||'—', 'b-warm',
       tip(`${renT}の未確定`, 'まだ更新・解約が決まっていない契約の更新前ARR', `社数 = ${nn(X.pendN)}社\n金額 = ${yen(X.pend)}`,
         '更新見込（CS管理）の内訳：' + Object.entries(X.mix).map(([k,v])=>`${k} ${v.n}社・${mn(v.arr)}`).join('／'))) +
@@ -670,7 +680,7 @@ function render(){
       <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;font-size:11.5px">${Object.entries(r.mix).map(([k,v])=>`<span><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${col[k]};margin-right:4px"></span>${k} ${yen(v)}（${pct(v/tot,0)}）</span>`).join('')}</div>`;
   }
 
-  drawTrend(key,P); drawBridge(r,pl,el); drawRate(key,P); drawCmp(P); drawRisk(P); drawSheet(key,P);
+  drawTrend(key,P); drawBridge(r,pl,el); drawRate(key,P); drawCmp(P); drawAct(key,P); drawRisk(P); drawSheet(key,P);
 }
 
 function baseOpts(){ return { responsive:true, maintainAspectRatio:false, animation:{duration:500},
@@ -749,10 +759,71 @@ function drawCmp(P){
   document.querySelectorAll('#cmp tbody tr').forEach(tr=>tr.onclick=()=>{ S.scope=tr.dataset.k; S.name=tr.dataset.n; syncScope(); render(); jump('sec-summary'); });
 }
 
+// ---------- 行動量（HubSpotのミーティング・通話・メール。行動管理シートの集計_月次・区分CSM） ----------
+function calcAct(key, ms){
+  const U=(D.act||{})[key]||{}; const s=k=>ms.reduce((a,m)=>a+((U[m]||{})[k]||0),0);
+  const done = ms.filter(m=>m<=CUR);                                   // 来月以降は数えない
+  const x={ mtg:s('mtg'), call:s('call'), conn:s('conn'), mail:s('mail'), plan:s('plan') };
+  x.total = x.mtg+x.call+x.mail;
+  x.pm = done.reduce((a,m)=>a+((U[m]||{}).people||0),0);             // 人月（その月に活動した人の数を月ごとに足したもの）
+  x.nm = done.length;
+  return x;
+}
+function drawAct(key,P){
+  const span = `<span style="font-weight:500;color:var(--ink-faint);letter-spacing:0;margin-left:6px">`;
+  const who = S.scope==='全体'?'全体':(S.scope==='CS'||S.scope==='PS')?S.scope:S.name;
+  document.getElementById('hAct').innerHTML = `${P.short}の行動量（${esc(who)}）${span}${P.view}／HubSpotのミーティング・通話・メール（CSMとしての活動）。毎時更新</span>`;
+  if(!D.act){
+    document.getElementById('kAct').innerHTML = `<div class="card" style="grid-column:1/-1;color:var(--ink-faint)">行動量のデータを読めませんでした（GASの設定 CS_CFG.ACTIVITY と、行動管理シートへのアクセスを確認）</div>`;
+    document.getElementById('actTbl').innerHTML=''; if(charts.cAct){charts.cAct.destroy(); delete charts.cAct;} return;
+  }
+  const x = calcAct(key,P.ms), isMem = S.scope==='メンバー';
+  const nn = v => (v||0).toLocaleString('ja-JP');
+  const avg = v => `${isMem?'月平均':'1人あたり月平均'} ${x.pm?(v/x.pm).toFixed(1):'—'}件`;
+  const avgTip = isMem ? `月平均 ＝ 件数 ÷ CSMとして活動した月数（${x.pm}か月）` : `1人あたり月平均 ＝ 件数 ÷ 人月（その月に1件以上活動した人の数を月ごとに足したもの ＝ ${x.pm}）`;
+  const unit = '<span style="font-size:15px;font-weight:600">件</span>';
+  document.getElementById('kAct').innerHTML =
+    kpi(`${P.short}のミーティング`, nn(x.mtg)+unit, avg(x.mtg)+(x.plan?`<br>このあと予定 <b>${nn(x.plan)}件</b>`:''), 'b-brand',
+      tip('ミーティング', 'HubSpotのミーティングの件数', `= ${nn(x.mtg)}件`, '実施済みの件数。結果が「キャンセル」「日程変更」「ノーショー」のものは数えない。日時が今より先のミーティングは「このあと予定」として別に出す（日時が過ぎると実施に入る）。結果が入っていない（予定済みのまま）ミーティングは数える。'+avgTip)) +
+    kpi(`${P.short}の通話`, nn(x.call)+unit, `つながった ${nn(x.conn)}件（${x.call?pct(x.conn/x.call,0):'—'}）<br>${avg(x.call)}`, 'b-cyan',
+      tip('通話', 'HubSpotの通話の件数（すべて）', `= ${nn(x.call)}件／つながった ${nn(x.conn)}件`, 'つながった通話＝通話の結果が「接続済み」、または通話時間30秒以上。'+avgTip)) +
+    kpi(`${P.short}のメール`, nn(x.mail)+unit, avg(x.mail), 'b-ok',
+      tip('メール', 'HubSpotのメールのうち送信・転送の件数', `= ${nn(x.mail)}件`, '受信メールは数えない。'+avgTip)) +
+    kpi(`${P.short}の合計`, nn(x.total)+unit, avg(x.total), 'b-warm',
+      tip('合計', 'ミーティング ＋ 通話 ＋ メール', `= ${nn(x.mtg)} ＋ ${nn(x.call)} ＋ ${nn(x.mail)} = ${nn(x.total)}件`, 'メモ・タスクは数えない。CTSとしての活動（兼務者のチケットに紐づく通話・メール）と、CSに来る前の活動は含めない'));
+  // 月ごとの推移（積み上げ棒＋つながった通話の線）。月別表示では年度の中で選んだ月を強調
+  const SH = P.ms.length>1 ? P.ms : M, on = m => P.ms.includes(m);
+  const U=(D.act||{})[key]||{}; const g=(m,k)=>m>CUR?null:((U[m]||{})[k]||0);
+  const fade = (m,c) => on(m) ? c : c.replace(/[\d.]+\)$/,'0.25)');
+  const o=baseOpts(); o.scales.x.stacked=true; o.scales.y.stacked=true; o.scales.y.ticks.callback=v=>v.toLocaleString('ja-JP');
+  o.plugins.tooltip.callbacks={label:c=>c.raw==null?'':`${c.dataset.label}: ${c.raw.toLocaleString('ja-JP')}件`};
+  mk('cAct',{ data:{ labels:SH.map(m=>parseInt(m.slice(5))+'月'), datasets:[
+    {type:'bar',label:'ミーティング',data:SH.map(m=>g(m,'mtg')),backgroundColor:SH.map(m=>fade(m,'rgba(58,120,181,.85)')),borderRadius:4,stack:'a'},
+    {type:'bar',label:'通話',data:SH.map(m=>g(m,'call')),backgroundColor:SH.map(m=>fade(m,'rgba(42,157,180,.75)')),borderRadius:4,stack:'a'},
+    {type:'bar',label:'メール',data:SH.map(m=>g(m,'mail')),backgroundColor:SH.map(m=>fade(m,'rgba(47,158,138,.60)')),borderRadius:4,stack:'a'},
+    {type:'bar',label:'ミーティング予定',data:SH.map(m=>{const v=(U[m]||{}).plan||0; return v||null;}),backgroundColor:SH.map(m=>fade(m,'rgba(58,120,181,.25)')),borderColor:css('--brand-mid'),borderWidth:1,borderDash:[4,3],borderRadius:4,stack:'a'},
+    {type:'line',label:'つながった通話',data:SH.map(m=>g(m,'conn')),borderColor:css('--warm'),backgroundColor:css('--warm'),tension:.3,pointRadius:SH.map(m=>on(m)?5:2),stack:'b'}
+  ]}, options:o });
+  // メンバー別（選んだ単位に入るCS・PSのメンバー）
+  let rows;
+  if(S.scope==='チーム') rows=members.filter(m=>D.meta.members[m]===S.name);
+  else if(isMem){ const t=D.meta.members[S.name]; rows=members.filter(m=>D.meta.members[m]===t); }
+  else rows=members.filter(m=>S.scope==='全体'||(D.meta.teams[D.meta.members[m]]||{}).juris===S.scope);
+  const data=rows.map(n=>({n,t:D.meta.members[n],y:calcAct('メンバー:'+n,P.ms)})).filter(d=>d.y.total>0||d.y.plan>0).sort((a,b)=>b.y.total-a.y.total);
+  document.getElementById('actTblTitle').textContent = (S.scope==='チーム'?S.name+' の':isMem?D.meta.members[S.name]+' の':'')+`メンバー別（${P.short}）`;
+  const maxT=Math.max(...data.map(d=>d.y.total),1);
+  document.getElementById('actTbl').innerHTML = data.length? `<thead><tr><th style="text-align:left">メンバー</th><th>ミーティング</th><th>通話</th><th>つながった</th><th>メール</th><th>合計</th><th data-tip="ミーティング予定||日時が今より先のミーティング（この期間内）">予定</th><th data-tip="月平均||合計 ÷ CSMとして活動した月数">月平均</th></tr></thead><tbody>`+
+    data.map(({n,t,y})=>`<tr data-n="${esc(n)}" class="${S.name===n?'sel':''}" style="cursor:pointer"><td style="text-align:left"><b>${esc(n)}</b><span style="color:var(--ink-faint);font-size:11px;margin-left:6px">${esc(t)}</span></td>
+      <td class="num">${nn(y.mtg)}</td><td class="num">${nn(y.call)}</td><td class="num">${nn(y.conn)}</td><td class="num">${nn(y.mail)}</td>
+      <td class="num"><span class="bar-cell" style="width:${y.total/maxT*50}px"></span>${nn(y.total)}</td><td class="num" style="color:var(--brand-mid)">${y.plan?nn(y.plan):'—'}</td><td class="num">${y.pm?(y.total/y.pm).toFixed(0):'—'}</td></tr>`).join('')+'</tbody>'
+    : `<tbody><tr><td style="color:var(--ink-faint)">この期間の行動量はありません</td></tr></tbody>`;
+  document.querySelectorAll('#actTbl tbody tr[data-n]').forEach(tr=>tr.onclick=()=>{ S.scope='メンバー'; S.name=tr.dataset.n; syncScope(); render(); jump('sec-activity'); });
+}
+
 const pd = mo => mo<=1?.85: mo>=6?.30: mo<=3? .85+(.50-.85)*(mo-1)/2 : .50+(.30-.50)*(mo-3)/3;
 function inScope(x){ return S.scope==='全体' || (S.scope==='CS'||S.scope==='PS'? x.juris===S.scope : S.scope==='チーム'? x.team===S.name : x.member===S.name); }
 function drawRisk(P){
-  const L = (D.rlist||[]).filter(x=>inScope(x) && P.ms.includes(x.end.slice(0,7)) && (S.cohort!=='ex' || !x.nw));
+  const L = (D.rlist||[]).filter(x=>inScope(x) && P.ms.includes(x.em || x.end.slice(0,7)) && (S.cohort!=='ex' || !x.nw));
   const isPlan = x => x.look==='更新予定'||x.look==='継続更新予定';
   const groups = {
     follow:{lb:`${P.short}更新 要フォロー（危険・不明・未入力）`, rows:L.filter(x=>x.st==='未決着'&&!isPlan(x))},
