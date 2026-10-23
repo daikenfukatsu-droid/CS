@@ -318,6 +318,10 @@
   .rc a.big .lbl{ font-size:11px; font-weight:700; color:var(--ink-faint); margin-right:2px; cursor:help; }
   .rc a.big small{ font-size:13px; font-weight:600; color:var(--ink-soft); }
   .rrows{ display:flex; flex-direction:column; gap:2px; }
+  .pgs{ display:flex; flex-wrap:wrap; gap:2px 12px; padding:0 0 2px 18px; font-size:11.5px; color:var(--ink-soft); }
+  .pgs a{ display:inline-flex; align-items:center; gap:4px; cursor:pointer; } .pgs a:hover{ color:var(--brand); }
+  .pgs i{ width:7px; height:7px; border-radius:2px; display:inline-block; } .pgs b{ font-weight:700; color:var(--ink); }
+  .pgp{ display:inline-flex; align-items:center; gap:5px; font-size:11.5px; white-space:nowrap; color:var(--ink-soft); } .pgp i{ width:8px; height:8px; border-radius:2px; background:var(--c); }
   .rrow2{ display:flex; align-items:center; gap:7px; font-size:12.5px; color:var(--ink-soft); padding:3px 4px; border-radius:6px; }
   .rrow2:hover{ background:var(--surface-2); text-decoration:none !important; }
   .rrow2 i{ width:8px; height:8px; border-radius:2px; display:inline-block; }
@@ -598,11 +602,15 @@ function calc(key, ms){
 }
 
 // 更新の進捗：利用終了日の月で数える（「10月更新」＝利用終了日が10月の契約）
+/* 未決着の段階（CS管理 AA承認済・AB送付済／送付不要・AC バクラク済／フォーム送付済）。進んでいる順 */
+const PG = [['sign','締結手続き中','#6F7E95'],['sent','見積送付済','#93A1B5'],['skip','送付不要','#B4BFCD'],['appr','見積承認済','#C9D2DD'],['none','未着手','#DDE3EA'],['unk','CS管理なし','#ECEFF3']];
+const PG_TIP = {sign:'AC列「バクラク済:1／フォーム送付済:2」が入っている',sent:'AB列「送付済:1」が入っている',skip:'AB列「送付不要:99」が入っている',appr:'AA列「承認済:1」だけ入っている（見積はまだ送っていない）',none:'AA・AB・AC列のどれも入っていない',unk:'CS管理シートの行と結べない契約'};
 function calcRen(key, ms){
   const U=(D.renew||{})[key]||{}; const PX = '';   /* 2026-10-21：今期の新規顧客も含む（集計シートの式と同じ） */ const s=k=>ms.reduce((a,m)=>a+(((U[m]||{})[PX+k])||0),0);
   const x={ n:s('n'), arr:s('arr'), renN:s('renN'), renPre:s('renPre'), renTot:s('renTot'), renPost:s('renPost'), upN:s('upN'), up:s('up'), downN:s('downN'), down:s('down'), flatN:s('flatN'),
     churnN:s('churnN'), churn:s('churn'), pendN:s('pendN'), pend:s('pend'), myN:s('myN'), myArr:s('myArr'), mix:{} };
   ['更新予定','継続更新予定','危険','不明','未入力'].forEach(st=>x.mix[st]={n:s('n_'+st),arr:s('arr_'+st)});
+  x.pg={}; PG.forEach(([k])=>x.pg[k]={n:s('pgN_'+k),arr:s('pg_'+k)});
   x.land={}; ['min','mid','max'].forEach(sc=>x.land[sc]=x.renPost + x.pend - s('loss_'+sc));
   x.lossMid = s('loss_mid');
   x.decN = x.renN + x.churnN; x.rateN = x.n ? x.renN/x.n : null; x.rateA = x.arr ? x.renPre/x.arr : null;
@@ -857,23 +865,24 @@ function drawRenCards(key){
 function rcRows(i,k){
   const Pi=(S.rcPs||[])[i]; if(!Pi) return null;
   const L=(D.rlist||[]).filter(x=>inScope(x) && Pi.ms.includes(x.em || x.end.slice(0,7)) && x.st!=='複数年' &&
-    (k==='all' || (k==='ren'&&x.st==='更新') || (k==='churn'&&x.st==='解約') || (k==='pend'&&x.st==='未決着')));
+    (k==='all' || (k==='ren'&&x.st==='更新') || (k==='churn'&&x.st==='解約') || (k==='pend'&&x.st==='未決着') || (k.startsWith('pg:')&&x.st==='未決着'&&(x.stg||'unk')===k.slice(3))));
   const g={}; L.forEach(x=>{ const o=x.owner||'（担当者なし）'; (g[o]||(g[o]=[])).push(x); });
   const owners=Object.keys(g).sort((a,b)=>g[b].length-g[a].length||a.localeCompare(b,'ja'));
   owners.forEach(o=>g[o].sort((a,b)=>a.end.localeCompare(b.end)));
-  return { P:Pi, lb:{all:'対象',ren:'更新確定',churn:'解約',pend:'未決着'}[k], L, g, owners };
+  return { P:Pi, lb:{all:'対象',ren:'更新確定',churn:'解約',pend:'未決着'}[k] || ('未決着・'+((PG.find(([a])=>'pg:'+a===k)||[])[1]||'')), L, g, owners };
 }
 const RC_LK = {'更新予定':'p-ok','継続更新予定':'p-ok','危険':'p-danger','不明':'p-warn'};
 const rcName = x => { const n=esc(x.hs||x.name||x.id); return x.url?`<a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${n}</a>`:n; };
 const rcLook = x => x.dlook?`<span class="pill ${RC_LK[x.dlook]||'p-gray'}">${esc(x.dlook)}</span>`:'<span style="color:var(--ink-faint)">（空欄）</span>';
+const rcPg = x => { if(x.st!=='未決着') return ''; const g=PG.find(([a])=>a===(x.stg||'unk')); return `<span class="pgp" style="--c:${g[2]}"><i></i>${g[1]}</span>`; };
 const rcY = v => v==null?'—':Math.round(v).toLocaleString('ja-JP');
 const rcDiff = x => x.diff==null?'—':`<span class="${x.diff>0?'up':x.diff<0?'dn':''}">${x.diff>0?'+':''}${rcY(x.diff)}</span>`;
 // 状態（更新・解約・未決着）のラベル。色は意味のある色だけ（更新＝青・解約＝赤・未決着＝グレー）
 const rcSt = x => { const m = {'更新':['st-ren','更新'],'解約':['st-churn','解約'],'未決着':['st-pend','未決着']}[x.st] || ['st-pend', x.st||'—']; return x.cs ? `<span class="stp ${m[0]} st-cs qtip" data-tip="CS管理で${m[1]}||契約DBにはまだ反映されていない（CS管理のM列「決着」を1時間ごとに読んでいる）||金額は契約DBに反映されてから確定">${m[1]}</span>` : `<span class="stp ${m[0]}">${m[1]}</span>`; };
 function rcTable(R, owner){   // 全列の表（担当者ごと）
   const os = owner ? [owner] : R.owners;
-  return `<div class="tbl-wrap"><table class="rct"><thead><tr><th>HubSpot会社名</th><th>状態</th><th>会社担当者</th><th>アカウント種別</th><th class="r">契約終了日</th><th>更新見込_CS管理</th><th class="r">前の契約のARR</th><th class="r">開始時ARR</th><th class="r">ARR増減額</th></tr></thead><tbody>${
-    os.map(o=>`<tr class="grp"><td colspan="9">${esc(o)}（${R.g[o].length}契約）</td></tr>`+R.g[o].map(x=>`<tr><td>${rcName(x)}</td><td>${rcSt(x)}</td><td>${esc(x.owner||'')}</td><td>${esc(x.acct||'')}</td><td class="r num">${esc(x.end)}</td><td>${rcLook(x)}</td><td class="r num">${rcY(x.prevArr)}</td><td class="r num">${rcY(x.startArr)}</td><td class="r num">${rcDiff(x)}</td></tr>`).join('')).join('')
+  return `<div class="tbl-wrap"><table class="rct"><thead><tr><th>HubSpot会社名</th><th>状態</th><th>見積</th><th>更新見込_CS管理</th><th>アカウント種別</th><th class="r">契約終了日</th><th class="r">前の契約のARR</th><th class="r">開始時ARR</th><th class="r">ARR増減額</th></tr></thead><tbody>${
+    os.map(o=>`<tr class="grp"><td colspan="9">${esc(o)}（${R.g[o].length}契約）</td></tr>`+R.g[o].map(x=>`<tr><td>${rcName(x)}</td><td>${rcSt(x)}</td><td>${rcPg(x)}</td><td>${rcLook(x)}</td><td>${esc(x.acct||'')}</td><td class="r num">${esc(x.end)}</td><td class="r num">${rcY(x.prevArr)}</td><td class="r num">${rcY(x.startArr)}</td><td class="r num">${rcDiff(x)}</td></tr>`).join('')).join('')
     || '<tr><td colspan="9" style="color:var(--ink-faint)">該当する企業はありません</td></tr>'}</tbody></table></div>`;
 }
 function rcCompact(R, max){   // 小さい一覧（会社名・見込・ARR）
