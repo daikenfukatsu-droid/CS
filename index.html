@@ -1223,7 +1223,7 @@ function drawCmp(P){
 function calcAct(key, ms){
   const U=(D.act||{})[key]||{}; const s=k=>ms.reduce((a,m)=>a+((U[m]||{})[k]||0),0);
   const done = ms.filter(m=>m<=CUR);                                   // 来月以降は数えない
-  const x={ mtg:s('mtg'), call:s('call'), conn:s('conn'), mail:s('mail'), plan:s('plan') };
+  const x={ mtg:s('mtg'), call:s('call'), conn:s('conn'), mail:s('mail'), plan:s('plan'), att:s('att') };
   x.total = x.mtg+x.call+x.mail;
   x.pm = done.reduce((a,m)=>a+((U[m]||{}).people||0),0);             // 人月（その月に活動した人の数を月ごとに足したもの）
   x.nm = done.length;
@@ -1243,8 +1243,8 @@ function drawAct(key,P){
   const avgTip = isMem ? `月平均 ＝ 件数 ÷ CSMとして活動した月数（${x.pm}か月）` : `1人あたり月平均 ＝ 件数 ÷ 人月（その月に1件以上活動した人の数を月ごとに足したもの ＝ ${x.pm}）`;
   const unit = '<span style="font-size:15px;font-weight:600">件</span>';
   document.getElementById('kAct').innerHTML =
-    kpi(`${P.short}のミーティング`, nn(x.mtg)+unit, avg(x.mtg)+(x.plan?`<br>このあと予定 <b>${nn(x.plan)}件</b>`:''), 'b-brand',
-      tip('ミーティング', 'HubSpotのミーティングの件数', `= ${nn(x.mtg)}件`, '実施済みの件数。結果が「キャンセル」「日程変更」「ノーショー」のものは数えない。日時が今より先のミーティングは「このあと予定」として別に出す（日時が過ぎると実施に入る）。結果が入っていない（予定済みのまま）ミーティングは数える。'+avgTip)) +
+    kpi(`${P.short}のミーティング`, nn(x.mtg)+unit, avg(x.mtg)+`<br>同席 <b>${nn(x.att)}件</b>`+(x.plan?`・このあと予定 <b>${nn(x.plan)}件</b>`:''), 'b-brand',
+      tip('ミーティング', '主催したミーティングの件数（顧客接点）。同席は別に数える（稼働量）', `= ${nn(x.mtg)}件／同席 ${nn(x.att)}件`, '主催＝会社の所有者（ミーティング当日）が出ていればその人、いなければホスト。同席＝HubSpotのミーティングの参加者に入っていた社内の人（参加者に入っていないと数えられない）。合計には主催だけを入れ、同席は入れない。実施済みの件数。結果が「キャンセル」「日程変更」「ノーショー」のものは数えない。日時が今より先のミーティングは「このあと予定」として別に出す（日時が過ぎると実施に入る）。結果が入っていない（予定済みのまま）ミーティングは数える。'+avgTip)) +
     kpi(`${P.short}の通話`, nn(x.call)+unit, `つながった ${nn(x.conn)}件（${x.call?pct(x.conn/x.call,0):'—'}）<br>${avg(x.call)}`, 'b-cyan',
       tip('通話', 'HubSpotの通話の件数（すべて）', `= ${nn(x.call)}件／つながった ${nn(x.conn)}件`, 'つながった通話＝通話の結果が「接続済み」、または通話時間30秒以上。'+avgTip)) +
     kpi(`${P.short}のメール`, nn(x.mail)+unit, avg(x.mail), 'b-ok',
@@ -1269,12 +1269,12 @@ function drawAct(key,P){
   if(S.scope==='チーム') rows=members.filter(m=>D.meta.members[m]===S.name);
   else if(isMem){ const t=D.meta.members[S.name]; rows=members.filter(m=>D.meta.members[m]===t); }
   else rows=members.filter(m=>S.scope==='全体'||(D.meta.teams[D.meta.members[m]]||{}).juris===S.scope);
-  const data=rows.map(n=>({n,t:D.meta.members[n],y:calcAct('メンバー:'+n,P.ms)})).filter(d=>d.y.total>0||d.y.plan>0).sort((a,b)=>b.y.total-a.y.total);
+  const data=rows.map(n=>({n,t:D.meta.members[n],y:calcAct('メンバー:'+n,P.ms)})).filter(d=>d.y.total>0||d.y.plan>0||d.y.att>0).sort((a,b)=>b.y.total-a.y.total);
   document.getElementById('actTblTitle').textContent = (S.scope==='チーム'?S.name+' の':isMem?D.meta.members[S.name]+' の':'')+`メンバー別（${P.short}）`;
   const maxT=Math.max(...data.map(d=>d.y.total),1);
-  document.getElementById('actTbl').innerHTML = data.length? `<thead><tr><th style="text-align:left">メンバー</th><th>ミーティング</th><th>通話</th><th>つながった</th><th>メール</th><th>合計</th><th data-tip="ミーティング予定||日時が今より先のミーティング（この期間内）">予定</th><th data-tip="月平均||合計 ÷ CSMとして活動した月数">月平均</th></tr></thead><tbody>`+
+  document.getElementById('actTbl').innerHTML = data.length? `<thead><tr><th style="text-align:left">メンバー</th><th>ミーティング</th><th data-tip="同席||HubSpotのミーティングの参加者として入った件数（主催は除く）。稼働量として見る。合計には入れない">同席</th><th>通話</th><th>つながった</th><th>メール</th><th>合計</th><th data-tip="ミーティング予定||日時が今より先のミーティング（この期間内）">予定</th><th data-tip="月平均||合計 ÷ CSMとして活動した月数">月平均</th></tr></thead><tbody>`+
     data.map(({n,t,y})=>`<tr data-n="${esc(n)}" class="${S.name===n?'sel':''}" style="cursor:pointer"><td style="text-align:left"><b>${esc(n)}</b><span style="color:var(--ink-faint);font-size:11px;margin-left:6px">${esc(t)}</span></td>
-      <td class="num">${nn(y.mtg)}</td><td class="num">${nn(y.call)}</td><td class="num">${nn(y.conn)}</td><td class="num">${nn(y.mail)}</td>
+      <td class="num">${nn(y.mtg)}</td><td class="num" style="color:var(--ink-soft)">${y.att?nn(y.att):'—'}</td><td class="num">${nn(y.call)}</td><td class="num">${nn(y.conn)}</td><td class="num">${nn(y.mail)}</td>
       <td class="num"><span class="bar-cell" style="width:${y.total/maxT*50}px"></span>${nn(y.total)}</td><td class="num" style="color:var(--brand-mid)">${y.plan?nn(y.plan):'—'}</td><td class="num">${y.pm?(y.total/y.pm).toFixed(0):'—'}</td></tr>`).join('')+'</tbody>'
     : `<tbody><tr><td style="color:var(--ink-faint)">この期間の行動量はありません</td></tr></tbody>`;
   document.querySelectorAll('#actTbl tbody tr[data-n]').forEach(tr=>tr.onclick=()=>{ S.scope='メンバー'; S.name=tr.dataset.n; syncScope(); render(); jump('sec-activity'); });
