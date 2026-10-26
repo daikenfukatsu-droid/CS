@@ -787,7 +787,7 @@ function nrrList(key, b, k, backHtml){
   if(k==='down') L = (D.elist||[]).filter(x=>inScope(x) && x.kind==='down' && inM(x.em)).map(x=>({...x, mon:x.em}));
   if(k==='cross') L = (D.elist||[]).filter(x=>inScope(x) && x.kind==='cross' && inM(x.em)).map(x=>({...x, what:'クロスセル（単発）', mon:x.em}));
   const lab = {base:'更新対象',ren:'更新して残った',up:'アップセル',down:'ダウンセル',churn:'解約',pend:'未決着',cross:'クロスセル'}[k];
-  const g = {}; L.forEach(x=>{ const o=x.owner||'（担当者なし）'; (g[o]||(g[o]=[])).push(x); });
+  const g = {}; L.forEach(x=>{ const o=x.member||x.owner||'（担当者なし）';   /* 解約後はHubSpotの所有者が付け替わるので、集計と同じ担当者（解約＝CS管理の担当者）で分ける */ (g[o]||(g[o]=[])).push(x); });
   const os = Object.keys(g).sort((a,c)=>g[c].reduce((s,x)=>s+x.amt,0)-g[a].reduce((s,x)=>s+x.amt,0));
   const sum = L.reduce((s,x)=>s+(x.amt||0),0);
   document.getElementById('nrrBox').innerHTML = `<div class="rc-mh"><div><a class="nd-back" id="ndBack">← 集計表に戻る</a><h3>${b.lab} ${lab}の企業（${L.length}件・${yen(sum)}）</h3><div class="cap">会社担当者ごと（金額の大きい順）。会社名をクリックするとHubSpotの会社ページを開きます</div></div><button class="uix-btn" data-rcx><i class="ti ti-x"></i></button></div>
@@ -872,7 +872,7 @@ function rcRows(i,k){
   const Pi=(S.rcPs||[])[i]; if(!Pi) return null;
   const L=(D.rlist||[]).filter(x=>inScope(x) && Pi.ms.includes(x.em || x.end.slice(0,7)) && x.st!=='複数年' &&
     (k==='all' || (k==='ren'&&x.st==='更新') || (k==='churn'&&x.st==='解約') || (k==='pend'&&x.st==='未決着') || (k.startsWith('pg:')&&x.st==='未決着'&&(x.stg||'unk')===k.slice(3))));
-  const g={}; L.forEach(x=>{ const o=x.owner||'（担当者なし）'; (g[o]||(g[o]=[])).push(x); });
+  const g={}; L.forEach(x=>{ const o=x.member||x.owner||'（担当者なし）';   /* 解約後はHubSpotの所有者が付け替わるので、集計と同じ担当者（解約＝CS管理の担当者）で分ける */ (g[o]||(g[o]=[])).push(x); });
   const owners=Object.keys(g).sort((a,b)=>g[b].length-g[a].length||a.localeCompare(b,'ja'));
   owners.forEach(o=>g[o].sort((a,b)=>a.end.localeCompare(b.end)));
   return { P:Pi, lb:{all:'対象',ren:'更新確定',churn:'解約',pend:'未決着'}[k] || ('未決着・'+((PG.find(([a])=>'pg:'+a===k)||[])[1]||'')), L, g, owners };
@@ -910,7 +910,7 @@ function rcClose(){ document.querySelectorAll('.rc-pop,.rc-modal,.rc-drawer').fo
 function rcOpen(i,k,anchor,mode){
   rcClose(); const R=rcRows(i,k); if(!R) return; S.rcl={i,k}; mode=mode||S.rcMode;
   const title=`${R.P.short}更新 ${R.lb}の企業（${R.L.length}契約）`;
-  const cap='会社担当者ごと。会社名をクリックするとHubSpotの会社ページを開きます。金額は円';
+  const cap='担当CSMごと（解約はCS管理の担当者）。会社名をクリックするとHubSpotの会社ページを開きます。金額は円';
   if(mode==='accordion'){
     const el=document.getElementById('rcAcc'+i); el.classList.add('open');
     el.innerHTML=`<div class="rc-acch"><b>${title}</b><a data-rcx>閉じる ▲</a></div>${R.owners.map((o,j)=>`<details ${j===0?'open':''}><summary>${esc(o)}<span>${R.g[o].length}契約</span></summary>${R.g[o].map(x=>`<div class="rcr"><span class="nm">${rcName(x)}</span>${rcLook(x)}<span class="num">${rcY(x.startArr)}</span></div><div class="rcr2">${esc(x.acct||'')}・${esc(x.end)}・前 ${rcY(x.prevArr)}・増減 ${rcDiff(x)}</div>`).join('')}</details>`).join('')||'<div class="sub">該当なし</div>'}`;
