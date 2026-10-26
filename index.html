@@ -322,6 +322,7 @@
   .stg .dots{ display:inline-flex; gap:3px; } .stg .dots i{ width:9px; height:9px; border-radius:50%; background:var(--hair); box-shadow:inset 0 0 0 1px var(--gray-300); }
   .stg .dots i.on{ background:#8A97AB; box-shadow:none; }
   .stg.s-ren{ color:var(--hrc-blue); } .stg.s-ren .dots i.on{ background:var(--hrc-blue); }
+  .stg.s-cxl{ color:var(--danger); } .stg.s-cxl .dots i.on{ background:#E8A3A3; }
   .stg.s-churn{ color:var(--danger); } .stg.s-churn .dots i.on{ background:var(--danger); }
   .stg.st-cs .dots i:last-child{ background:transparent; box-shadow:inset 0 0 0 1.5px currentColor; } .stg.st-cs{ cursor:help; }
   .pgs{ display:flex; flex-wrap:wrap; gap:2px 12px; padding:0 0 2px 18px; font-size:11.5px; color:var(--ink-soft); }
@@ -608,9 +609,9 @@ function calc(key, ms){
 }
 
 // 更新の進捗：利用終了日の月で数える（「10月更新」＝利用終了日が10月の契約）
-/* 未決着の段階（CS管理 AA承認済・AB送付済／送付不要・AC バクラク済／フォーム送付済）。進んでいる順 */
-const PG = [['sign','クラウド送付済','#6F7E95'],['sent','見積送付済','#93A1B5'],['skip','送付不要','#B4BFCD'],['appr','見積承認済','#C9D2DD'],['none','未着手','#DDE3EA'],['unk','CS管理なし','#ECEFF3']];
-const PG_TIP = {sign:'AC列「バクラク済:1／フォーム送付済:2」が入っている',sent:'AB列「送付済:1」が入っている',skip:'AB列「送付不要:99」が入っている',appr:'AA列「承認済:1」だけ入っている（見積はまだ送っていない）',none:'AA・AB・AC列のどれも入っていない',unk:'CS管理シートの行と結べない契約'};
+/* 未決着の段階（CS管理 AA承認済・AB送付済／送付不要・AC バクラク済＝クラウド送付済／フォーム送付済＝解約予定）。進んでいる順 */
+const PG = [['cxl','解約予定','#E8A3A3'],['sign','クラウド送付済','#6F7E95'],['sent','見積送付済','#93A1B5'],['skip','送付不要','#B4BFCD'],['appr','見積承認済','#C9D2DD'],['none','未着手','#DDE3EA'],['unk','CS管理なし','#ECEFF3']];
+const PG_TIP = {cxl:'AC列「フォーム送付済:2」（解約フォームを送った）',sign:'AC列「バクラク済:1」が入っている',sent:'AB列「送付済:1」が入っている',skip:'AB列「送付不要:99」が入っている',appr:'AA列「承認済:1」だけ入っている（見積はまだ送っていない）',none:'AA・AB・AC列のどれも入っていない',unk:'CS管理シートの行と結べない契約'};
 function calcRen(key, ms){
   const U=(D.renew||{})[key]||{}; const PX = '';   /* 2026-10-21：今期の新規顧客も含む（集計シートの式と同じ） */ const s=k=>ms.reduce((a,m)=>a+(((U[m]||{})[PX+k])||0),0);
   const x={ n:s('n'), arr:s('arr'), renN:s('renN'), renPre:s('renPre'), renTot:s('renTot'), renPost:s('renPost'), upN:s('upN'), up:s('up'), downN:s('downN'), down:s('down'), flatN:s('flatN'),
@@ -885,7 +886,7 @@ const rcStage = x => {
   let at, lab, cls = '';
   if(x.st==='更新'){ at=4; lab='更新'; cls='s-ren'; }
   else if(x.st==='解約'){ at=4; lab='解約'; cls='s-churn'; }
-  else { const k = x.stg||'unk'; if(k==='unk'){ at=-1; lab='CS管理なし'; } else if(k==='skip'){ at=2; lab='送付不要'; } else { at=STG.findIndex(s=>s[0]===k); lab=STG[at][1]; } }
+  else { const k = x.stg||'unk'; if(k==='unk'){ at=-1; lab='CS管理なし'; } else if(k==='skip'){ at=2; lab='送付不要'; } else if(k==='cxl'){ at=3; lab='解約予定'; cls='s-cxl'; } else { at=STG.findIndex(s=>s[0]===k); lab=STG[at][1]; } }
   const dots = STG.map((s,j)=>`<i class="${j<=at?'on':''}"></i>`).join('');
   const tipT = x.cs ? ` qtip" data-tip="CS管理で${lab}||契約DBにはまだ反映されていない（CS管理のM列「決着」を1時間ごとに読んでいる）||金額は契約DBに反映されてから確定` : '';
   return `<span class="stg ${cls}${x.cs?' st-cs':''}${tipT}"><span class="dots">${dots}</span>${lab}</span>`;
@@ -897,7 +898,7 @@ const rcDiff = x => x.diff==null?'—':`<span class="${x.diff>0?'up':x.diff<0?'d
 const rcSt = x => { const m = {'更新':['st-ren','更新'],'解約':['st-churn','解約'],'未決着':['st-pend','未決着']}[x.st] || ['st-pend', x.st||'—']; return x.cs ? `<span class="stp ${m[0]} st-cs qtip" data-tip="CS管理で${m[1]}||契約DBにはまだ反映されていない（CS管理のM列「決着」を1時間ごとに読んでいる）||金額は契約DBに反映されてから確定">${m[1]}</span>` : `<span class="stp ${m[0]}">${m[1]}</span>`; };
 function rcTable(R, owner){   // 全列の表（担当者ごと）
   const os = owner ? [owner] : R.owners;
-  return `<div class="tbl-wrap"><table class="rct"><thead><tr><th>HubSpot会社名</th><th>ステージ<span class="help qtip" data-tip="ステージ||未着手 → 見積承認済 → 見積送付済（送付不要） → クラウド送付済 → 更新／解約||未決着の間はCS管理シートの入力で判定（AA承認済・AB送付済／送付不要・AC バクラク済／フォーム送付済）。決着はCS管理のM列「決着」">?</span></th><th>更新見込_CS管理</th><th>アカウント種別</th><th class="r">契約終了日</th><th class="r">前の契約のARR</th><th class="r">開始時ARR</th><th class="r">ARR増減額</th></tr></thead><tbody>${
+  return `<div class="tbl-wrap"><table class="rct"><thead><tr><th>HubSpot会社名</th><th>ステージ<span class="help qtip" data-tip="ステージ||未着手 → 見積承認済 → 見積送付済（送付不要） → クラウド送付済 → 更新||解約の流れ：解約予定（解約フォーム送付済） → 解約||未決着の間はCS管理シートの入力で判定（AA承認済・AB送付済／送付不要・AC バクラク済＝クラウド送付済／フォーム送付済＝解約予定）。決着はCS管理のM列「決着」">?</span></th><th>更新見込_CS管理</th><th>アカウント種別</th><th class="r">契約終了日</th><th class="r">前の契約のARR</th><th class="r">開始時ARR</th><th class="r">ARR増減額</th></tr></thead><tbody>${
     os.map(o=>`<tr class="grp"><td colspan="8">${esc(o)}（${R.g[o].length}契約）</td></tr>`+R.g[o].map(x=>`<tr><td>${rcName(x)}</td><td>${rcStage(x)}</td><td>${rcLook(x)}</td><td>${esc(x.acct||'')}</td><td class="r num">${esc(x.end)}</td><td class="r num">${rcY(x.prevArr)}</td><td class="r num">${rcY(x.startArr)}</td><td class="r num">${rcDiff(x)}</td></tr>`).join('')).join('')
     || '<tr><td colspan="8" style="color:var(--ink-faint)">該当する企業はありません</td></tr>'}</tbody></table></div>`;
 }
