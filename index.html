@@ -276,6 +276,7 @@
   .rc-drawer.in .rc-dbox{ transform:none; }
   .rc-mh{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:10px; } .rc-mh h3{ margin:0 0 4px; }
   .rc-chips{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+  a.actl{ color:inherit; text-decoration:underline dotted; text-underline-offset:3px; cursor:pointer; } a.actl:hover{ color:var(--brand); }
   .stp{ display:inline-block; font-size:11px; font-weight:700; padding:1px 8px; border-radius:9999px; white-space:nowrap; }
   .stp.st-cs{ background:transparent; box-shadow:inset 0 0 0 1px currentColor; border-style:dashed; cursor:help; }
   .stp.st-ren{ background:var(--blue-50); color:var(--hrc-blue); } .stp.st-churn{ background:#FCEAEA; color:var(--danger); } .stp.st-pend{ background:var(--surface-2); color:var(--ink-soft); }
@@ -1229,6 +1230,25 @@ function calcAct(key, ms){
   x.nm = done.length;
   return x;
 }
+/* ミーティングの一覧（行動量の件数をクリック）。誰が・いつ・どの会社と・何のミーティングをしたか */
+const ACT_K = {'主催':'主催したミーティング','同席':'同席したミーティング','予定':'このあと予定のミーティング'};
+function actOpen(kind, mem){
+  rcClose(); const P = S.actP; if(!P) return;
+  const L = (D.mlist||[]).filter(x=>P.ms.includes(x.m) && x.k===kind && (mem ? x.member===mem : inScope(x)));
+  const g={}; L.forEach(x=>{ (g[x.member]||(g[x.member]=[])).push(x); });
+  const os=Object.keys(g).sort((a,b)=>g[b].length-g[a].length||a.localeCompare(b,'ja'));
+  const who = mem || (S.scope==='全体'?'全体':(S.scope==='CS'||S.scope==='PS')?S.scope:S.name);
+  const tabs = Object.keys(ACT_K).map(k=>`<button class="chip ${k===kind?'on':''}" data-actk="${k}">${k}</button>`).join('');
+  const tbl = (only) => `<div class="tbl-wrap"><table class="rct"><thead><tr><th>日時</th><th>会社名</th><th>件名</th><th>主催</th><th>同席</th><th>結果</th></tr></thead><tbody>${
+    (only?[only]:os).map(o=>`<tr class="grp"><td colspan="6">${esc(o)}（${g[o].length}件）</td></tr>`+g[o].map(x=>`<tr><td class="num" style="white-space:nowrap">${esc(x.d)}</td><td>${x.url?`<a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.cn||'（会社なし）')}</a>`:esc(x.cn||'（会社なし）')}</td><td>${esc(x.ti)}</td><td>${esc(x.host)}</td><td>${esc(x.with)||'—'}</td><td>${esc(x.res)}</td></tr>`).join('')).join('')
+    || '<tr><td colspan="6" style="color:var(--ink-faint)">該当するミーティングはありません</td></tr>'}</tbody></table></div>`;
+  const chips = `<div class="rc-chips"><button class="chip on" data-actown="">すべて ${L.length}</button>${os.map(o=>`<button class="chip" data-actown="${esc(o)}">${esc(o)} ${g[o].length}</button>`).join('')}</div>`;
+  document.body.insertAdjacentHTML('beforeend',`<div class="rc-drawer" data-rcx-bg><div class="rc-dbox"><div class="rc-mh"><div><h3>${P.short}の${ACT_K[kind]}（${esc(who)}・${L.length}件）</h3><div class="cap">担当者ごと（新しい順）。会社名をクリックするとHubSpotの会社ページを開きます。主催＝会社の所有者（ミーティング当日）が出ていればその人、いなければホスト</div></div><button class="uix-btn" data-rcx><i class="ti ti-x"></i></button></div><div class="rc-chips">${tabs}</div>${chips}<div id="actDT">${tbl()}</div></div></div>`);
+  requestAnimationFrame(()=>{ const d=document.querySelector('.rc-drawer'); if(d) d.classList.add('in'); });
+  document.querySelectorAll('[data-actown]').forEach(b=>b.onclick=()=>{ document.querySelectorAll('[data-actown]').forEach(x=>x.classList.toggle('on',x===b)); document.getElementById('actDT').innerHTML=tbl(b.dataset.actown||null); });
+  document.querySelectorAll('[data-actk]').forEach(b=>b.onclick=()=>actOpen(b.dataset.actk, mem));
+}
+document.addEventListener('click',e=>{ const a=e.target.closest('[data-act]'); if(!a) return; e.preventDefault(); e.stopPropagation(); const [k,m]=a.dataset.act.split('|'); actOpen(k, m||null); }, true);
 function drawAct(key,P){
   const span = `<span style="font-weight:500;color:var(--ink-faint);letter-spacing:0;margin-left:6px">`;
   const who = S.scope==='全体'?'全体':(S.scope==='CS'||S.scope==='PS')?S.scope:S.name;
@@ -1237,13 +1257,14 @@ function drawAct(key,P){
     document.getElementById('kAct').innerHTML = `<div class="card" style="grid-column:1/-1;color:var(--ink-faint)">行動量のデータを読めませんでした（GASの設定 CS_CFG.ACTIVITY と、行動管理シートへのアクセスを確認）</div>`;
     document.getElementById('actTbl').innerHTML=''; if(charts.cAct){charts.cAct.destroy(); delete charts.cAct;} return;
   }
-  const x = calcAct(key,P.ms), isMem = S.scope==='メンバー';
+  const x = calcAct(key,P.ms), isMem = S.scope==='メンバー'; S.actP = P;
+  const al = (k, v, mem) => `<a class="actl" data-act="${k}|${mem?esc(mem):''}">${v}</a>`;   /* 件数クリック → ミーティングの一覧（サイドドロワー） */
   const nn = v => (v||0).toLocaleString('ja-JP');
   const avg = v => `${isMem?'月平均':'1人あたり月平均'} ${x.pm?(v/x.pm).toFixed(1):'—'}件`;
   const avgTip = isMem ? `月平均 ＝ 件数 ÷ CSMとして活動した月数（${x.pm}か月）` : `1人あたり月平均 ＝ 件数 ÷ 人月（その月に1件以上活動した人の数を月ごとに足したもの ＝ ${x.pm}）`;
   const unit = '<span style="font-size:15px;font-weight:600">件</span>';
   document.getElementById('kAct').innerHTML =
-    kpi(`${P.short}のミーティング`, nn(x.mtg)+unit, avg(x.mtg)+`<br>同席 <b>${nn(x.att)}件</b>`+(x.plan?`・このあと予定 <b>${nn(x.plan)}件</b>`:''), 'b-brand',
+    kpi(`${P.short}のミーティング`, al('主催', nn(x.mtg))+unit, avg(x.mtg)+`<br>同席 <b>${al('同席', nn(x.att)+'件')}</b>`+(x.plan?`・このあと予定 <b>${al('予定', nn(x.plan)+'件')}</b>`:''), 'b-brand',
       tip('ミーティング', '主催したミーティングの件数（顧客接点）。同席は別に数える（稼働量）', `= ${nn(x.mtg)}件／同席 ${nn(x.att)}件`, '主催＝会社の所有者（ミーティング当日）が出ていればその人、いなければホスト。同席＝HubSpotのミーティングの参加者に入っていた社内の人（参加者に入っていないと数えられない）。合計には主催だけを入れ、同席は入れない。実施済みの件数。結果が「キャンセル」「日程変更」「ノーショー」のものは数えない。日時が今より先のミーティングは「このあと予定」として別に出す（日時が過ぎると実施に入る）。結果が入っていない（予定済みのまま）ミーティングは数える。'+avgTip)) +
     kpi(`${P.short}の通話`, nn(x.call)+unit, `つながった ${nn(x.conn)}件（${x.call?pct(x.conn/x.call,0):'—'}）<br>${avg(x.call)}`, 'b-cyan',
       tip('通話', 'HubSpotの通話の件数（すべて）', `= ${nn(x.call)}件／つながった ${nn(x.conn)}件`, 'つながった通話＝通話の結果が「接続済み」、または通話時間30秒以上。'+avgTip)) +
@@ -1274,10 +1295,10 @@ function drawAct(key,P){
   const maxT=Math.max(...data.map(d=>d.y.total),1);
   document.getElementById('actTbl').innerHTML = data.length? `<thead><tr><th style="text-align:left">メンバー</th><th>ミーティング</th><th data-tip="同席||HubSpotのミーティングの参加者として入った件数（主催は除く）。稼働量として見る。合計には入れない">同席</th><th>通話</th><th>つながった</th><th>メール</th><th>合計</th><th data-tip="ミーティング予定||日時が今より先のミーティング（この期間内）">予定</th><th data-tip="月平均||合計 ÷ CSMとして活動した月数">月平均</th></tr></thead><tbody>`+
     data.map(({n,t,y})=>`<tr data-n="${esc(n)}" class="${S.name===n?'sel':''}" style="cursor:pointer"><td style="text-align:left"><b>${esc(n)}</b><span style="color:var(--ink-faint);font-size:11px;margin-left:6px">${esc(t)}</span></td>
-      <td class="num">${nn(y.mtg)}</td><td class="num" style="color:var(--ink-soft)">${y.att?nn(y.att):'—'}</td><td class="num">${nn(y.call)}</td><td class="num">${nn(y.conn)}</td><td class="num">${nn(y.mail)}</td>
-      <td class="num"><span class="bar-cell" style="width:${y.total/maxT*50}px"></span>${nn(y.total)}</td><td class="num" style="color:var(--brand-mid)">${y.plan?nn(y.plan):'—'}</td><td class="num">${y.pm?(y.total/y.pm).toFixed(0):'—'}</td></tr>`).join('')+'</tbody>'
+      <td class="num">${y.mtg?al('主催', nn(y.mtg), n):'0'}</td><td class="num" style="color:var(--ink-soft)">${y.att?al('同席', nn(y.att), n):'—'}</td><td class="num">${nn(y.call)}</td><td class="num">${nn(y.conn)}</td><td class="num">${nn(y.mail)}</td>
+      <td class="num"><span class="bar-cell" style="width:${y.total/maxT*50}px"></span>${nn(y.total)}</td><td class="num" style="color:var(--brand-mid)">${y.plan?al('予定', nn(y.plan), n):'—'}</td><td class="num">${y.pm?(y.total/y.pm).toFixed(0):'—'}</td></tr>`).join('')+'</tbody>'
     : `<tbody><tr><td style="color:var(--ink-faint)">この期間の行動量はありません</td></tr></tbody>`;
-  document.querySelectorAll('#actTbl tbody tr[data-n]').forEach(tr=>tr.onclick=()=>{ S.scope='メンバー'; S.name=tr.dataset.n; syncScope(); render(); jump('sec-activity'); });
+  document.querySelectorAll('#actTbl tbody tr[data-n]').forEach(tr=>tr.onclick=(e)=>{ if(e.target.closest('[data-act]')) return; S.scope='メンバー'; S.name=tr.dataset.n; syncScope(); render(); jump('sec-activity'); });
 }
 
 const pd = mo => mo<=1?.85: mo>=6?.30: mo<=3? .85+(.50-.85)*(mo-1)/2 : .50+(.30-.50)*(mo-3)/3;
