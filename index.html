@@ -582,9 +582,14 @@ function calc(key, ms){
   // 率（集計シート・計算ルールと同じ）
   r.nrc = r.open ? (r.churn + r.down - r.up)/r.open : null;            // NRC①
   r.nrr = r.nrc==null ? null : 1 - r.nrc;                               // NRR（期首ARR基準）
-  r.nrc2 = r.tgtArr ? (r.churn + r.down - r.up)/r.tgtArr : null;        // NRC②
+  // 2026-10-30：更新ベースの率は永井式（CS管理の年額＝金額÷契約月数×12。US/DS＝次の契約との年額の差。期中の追加は入れない）
+  const NG = (D.nagai||{})[key]; const ng = k => ms.reduce((a,m)=>a+(((NG||{})[m]||{})[k]||0),0);
+  r.n = NG ? { on:true, tgt:ng('tgt'), pend:ng('pend'), churn:ng('churn'), up:ng('up'), down:ng('down'), n:ng('n'), renN:ng('renN'), churnN:ng('churnN') }
+           : { on:false, tgt:r.tgtArr, pend:0, churn:r.churn, up:r.up, down:r.down };
+  r.n.dec = r.n.tgt - r.n.pend;                                         // 決着した分（更新＋解約）の年額
+  r.nrc2 = r.n.dec ? (r.n.churn + r.n.down - r.n.up)/r.n.dec : null;    // NRC（永井式）
   r.nrr2 = r.nrc2==null ? null : 1 - r.nrc2;                            // NRR（更新ベース）
-  r.rc = r.tgtArr ? (r.churn + r.down)/r.tgtArr : null;                 // レベニューチャーンレート
+  r.rc = r.n.dec ? (r.n.churn + r.n.down)/r.n.dec : null;               // レベニューチャーンレート
   r.cc1 = r.tgtIds ? r.churnIds/r.tgtIds : null;                        // カスタマーチャーンレート①
   r.cc2 = r.openIds ? r.churnIds/r.openIds : null;                      // カスタマーチャーンレート②
   // ARRブリッジ：期首＋新規＋US－DS－解約－未決着のまま満了＋要確認の動き＋担当替え＝期末（全体・管轄では担当替え＝0）
@@ -633,6 +638,17 @@ function calcRen(key, ms){
 //   予測＝確定分 ＋ 未決着 × 更新確率（更新予定80%・危険20%・不明/空欄50%）。クロスセル（単発）は計算ルールどおりNRRに入れず別に表示
 const NRC_TARGET = 0.0551, NRR_TARGET = 1 - NRC_TARGET;
 function nrrStat(key, ms){
+  const NG = (D.nagai||{})[key];
+  if (NG) {   // 2026-10-30：永井式（CS管理の年額。期中の追加は入れない）
+    const n = k => ms.reduce((a,m)=>a+(((NG[m]||{})[k])||0),0);
+    const base = n('tgt'), churnA = n('churn'), pendA = n('pend'), up = n('up'), down = n('down');
+    const pPlan = n('pend_更新予定') + n('pend_継続更新予定'), pDanger = n('pend_危険'), pOther = Math.max(0, pendA - pPlan - pDanger);
+    const kept = base - churnA - pendA - down, retained = kept + up;
+    const pendExp = pPlan*RC_P.plan + pDanger*RC_P.danger + pOther*RC_P.other, exp = retained + pendExp, decBase = base - pendA;
+    return { ms, base, churn:churnA, pend:pendA, up, down, upRen:up, downRen:down, midUp:0, midDown:0, kept, retained, pendExp, exp,
+      pPlan, pDanger, pOther, target: base*NRR_TARGET, nrr: decBase>0 ? retained/decBase : null, nrrFc: base ? exp/base : null,
+      cross: ms.reduce((a,m)=>a+(calc(key,[m]).cross||0),0), done: !pendA, fut: ms[0] > CUR, nagai: true };
+  }
   const U = (D.renew||{})[key]||{}, g = k => ms.reduce((a,m)=>a+(((U[m]||{})[k])||0),0);
   const X = calcRen(key, ms);
   const pPlan = X.mix['更新予定'].arr + X.mix['継続更新予定'].arr, pDanger = X.mix['危険'].arr, pOther = Math.max(0, X.pend - pPlan - pDanger);
@@ -1089,15 +1105,15 @@ function render(){
     kpi(`${sh}のNRR`, pct(r.nrr), d(r.nrr,pv&&pv.nrr), r.nrr>=1?'b-ok':'b-warm',
       tip('NRR（売上継続率・期首ARR基準）', `（${pl}ARR ＋ アップセル － ダウンセル － 解約）÷ ${pl}ARR`,
         `=（${mn(r.open)} ＋ ${mn(r.up)} － ${mn(r.down)} － ${mn(r.churn)}）÷ ${mn(r.open)} = ${pct(r.nrr)}`, '新規は含めない。＝ 1 － NRC①')) +
-    kpi(`${sh}のNRR（更新ベース）`, pct(r.nrr2), `更新を迎えた契約 ${yen(r.tgtArr)} が基準`, r.nrr2>=1?'b-ok':'b-warm',
-      tip('NRR（更新ベース）', '（更新前ARR ＋ アップセル － ダウンセル － 解約）÷ 更新前ARR',
-        `=（${mn(r.tgtArr)} ＋ ${mn(r.up)} － ${mn(r.down)} － ${mn(r.churn)}）÷ ${mn(r.tgtArr)} = ${pct(r.nrr2)}`,
-        '更新前ARR ＝ 期間中に更新を迎えた契約（更新・解約・アップセル・ダウンセル・増減なし）の更新前ARR合計。担当替えの影響を受けにくいのでメンバー比較向き。＝ 1 － NRC②')) +
-    kpi(`${sh}のNRC`, `${pct(r.nrc,2)}<span style="font-size:14px;color:var(--ink-faint);font-weight:600"> ／ ${pct(r.nrc2,1)}</span>`, '① 月初ARR比 ／ ② 更新対象比', 'b-warm',
-      tip('NRC（ネットレベニューチャーン）', `①（解約 ＋ ダウンセル － アップセル）÷ ${pl}ARR\n②（解約 ＋ ダウンセル － アップセル）÷ 更新前ARR`,
-        `① =（${mn(r.churn)} ＋ ${mn(r.down)} － ${mn(r.up)}）÷ ${mn(r.open)} = ${pct(r.nrc,2)}\n② =（${mn(r.churn)} ＋ ${mn(r.down)} － ${mn(r.up)}）÷ ${mn(r.tgtArr)} = ${pct(r.nrc2,1)}`,
-        'マイナスはアップセルが解約・ダウンセルを上回ったという意味（良い状態）')) +
-    kpi(`${sh}のレベニューチャーン`, pct(r.rc), `（解約＋ダウンセル）÷ 更新を迎えた契約 ${yen(r.tgtArr)}`, 'b-bad',
+    kpi(`${sh}のNRR（更新ベース）`, pct(r.nrr2), `更新を迎えた契約 ${yen(r.n.dec)} が基準（永井式）`, r.nrr2>=1?'b-ok':'b-warm',
+      tip('NRR（更新ベース・永井式）', '（更新対象 ＋ アップセル － ダウンセル － 解約）÷ 更新対象',
+        `=（${mn(r.n.dec)} ＋ ${mn(r.n.up)} － ${mn(r.n.down)} － ${mn(r.n.churn)}）÷ ${mn(r.n.dec)} = ${pct(r.nrr2)}`,
+        '永井式：金額は年額（CS管理の金額 ÷ 契約月数 × 12）。更新対象＝満了して決着した契約（更新＋解約）。アップセル／ダウンセル＝次の契約との年額の差。期中の追加は入れない。＝ 1 － NRC')) +
+    kpi(`${sh}のNRC`, `${pct(r.nrc2,2)}<span style="font-size:14px;color:var(--ink-faint);font-weight:600"> ／ ${pct(r.nrc,1)}</span>`, '永井式（更新対象比） ／ ① 月初ARR比', 'b-warm',
+      tip('NRC（ネットレベニューチャーン）', `永井式（解約 ＋ ダウンセル － アップセル）÷ 更新対象（年額・CS管理）\n①（解約 ＋ ダウンセル － アップセル）÷ ${pl}ARR（契約DB）`,
+        `永井式 =（${mn(r.n.churn)} ＋ ${mn(r.n.down)} － ${mn(r.n.up)}）÷ ${mn(r.n.dec)} = ${pct(r.nrc2,2)}\n① =（${mn(r.churn)} ＋ ${mn(r.down)} － ${mn(r.up)}）÷ ${mn(r.open)} = ${pct(r.nrc,1)}`,
+        '永井式＝2026-10-30に決めたCSの評価の数え方。マイナスはアップセルが解約・ダウンセルを上回ったという意味（良い状態）')) +
+    kpi(`${sh}のレベニューチャーン`, pct(r.rc), `（解約＋ダウンセル）÷ 更新対象 ${yen(r.n.dec)}（永井式）`, 'b-bad',
       tip('レベニューチャーンレート', '（解約 ＋ ダウンセル）÷ 更新前ARR', `=（${mn(r.churn)} ＋ ${mn(r.down)}）÷ ${mn(r.tgtArr)} = ${pct(r.rc)}`,
         'アップセルを差し引かない、純粋に失った金額の割合')) +
     kpi(`${sh}のカスタマーチャーン①`, pct(r.cc1), `解約 ${r.churnIds} ／ 更新対象 ${r.tgtIds} ID`, 'b-bad',
